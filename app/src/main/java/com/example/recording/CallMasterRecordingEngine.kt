@@ -7,11 +7,13 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.example.backup.GoogleDriveBackupManager
 import com.example.data.AppDatabase
 import com.example.data.CallDirection
 import com.example.data.CompletenessStatus
 import com.example.data.RecordingEntity
 import com.example.data.RecordingSource
+import com.example.preferences.CallMasterPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -81,11 +83,23 @@ class CallMasterRecordingEngine(private val context: Context) {
                 )
             }
 
-            val recordingsDir = File(context.filesDir, "recordings").apply {
-                if (!exists()) mkdirs()
+            val prefs = CallMasterPreferences(context)
+            val baseDir: File = if (prefs.customStorageFolder.isNotBlank()) {
+                File(prefs.customStorageFolder)
+            } else {
+                val ext = context.getExternalFilesDir(android.os.Environment.DIRECTORY_RECORDINGS)
+                if (ext != null) {
+                    File(ext, "CallMaster")
+                } else {
+                    File(context.filesDir, "recordings")
+                }
             }
+            if (!baseDir.exists()) {
+                baseDir.mkdirs()
+            }
+
             val fileName = "rec_${System.currentTimeMillis()}_${source.name.lowercase()}.m4a"
-            val file = File(recordingsDir, fileName)
+            val file = File(baseDir, fileName)
             currentOutputFile = file
             activeSource = source
             activeDirection = direction
@@ -99,17 +113,20 @@ class CallMasterRecordingEngine(private val context: Context) {
                 MediaRecorder()
             }
 
-            // Select supported audio source:
-            // VOICE_COMMUNICATION enables acoustic echo cancellation if available, fallback to MIC
-            try {
-                recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
-            } catch (_: Exception) {
+            // Two-party clarity: VOICE_COMMUNICATION enables acoustic echo cancellation and AGC
+            if (prefs.twoSidedAcousticBoost) {
+                try {
+                    recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+                } catch (_: Exception) {
+                    recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                }
+            } else {
                 recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
             }
 
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            recorder.setAudioEncodingBitRate(128000)
+            recorder.setAudioEncodingBitRate(prefs.audioBitrate)
             recorder.setAudioSamplingRate(44100)
             recorder.setOutputFile(file.absolutePath)
 
@@ -259,6 +276,13 @@ class CallMasterRecordingEngine(private val context: Context) {
         )
 
         database.recordingDao().insertRecording(entity)
+
+        val prefs = CallMasterPreferences(context)
+        if (prefs.isGoogleDriveAutoSyncEnabled) {
+            scope.launch {
+                GoogleDriveBackupManager.getInstance(context).syncRecording(entity)
+            }
+        }
 
         _sessionState.update {
             it.copy(

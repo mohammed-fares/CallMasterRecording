@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,9 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
@@ -48,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.player.CallMasterAudioPlayer
+import com.example.ui.theme.BorderGrayDark
 import com.example.ui.theme.DarkGreen
 import com.example.ui.theme.LightGold
 import com.example.ui.theme.PetroleumGreen
@@ -72,6 +76,7 @@ fun CallMasterPlayerBar(
             .testTag("audio_player_bar"),
         shape = RoundedCornerShape(16.dp),
         color = SurfaceDark,
+        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.6f)),
         tonalElevation = 6.dp,
         shadowElevation = 8.dp
     ) {
@@ -97,15 +102,31 @@ fun CallMasterPlayerBar(
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    IconButton(
+                        onClick = { player.toggleSpeakerphone() },
+                        modifier = Modifier.size(34.dp).testTag("player_speaker_mini")
+                    ) {
+                        Icon(
+                            imageVector = if (state.isSpeakerphoneOn) Icons.Default.VolumeUp else Icons.Default.Hearing,
+                            contentDescription = if (state.isSpeakerphoneOn) "مكبر الصوت" else "سماعة المكالمة",
+                            tint = if (state.isSpeakerphoneOn) RadiantGold else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     IconButton(
                         onClick = { player.skipBackward(10) },
-                        modifier = Modifier.size(36.dp).testTag("player_skip_back_mini")
+                        modifier = Modifier.size(34.dp).testTag("player_skip_back_mini")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Replay10,
                             contentDescription = "Skip -10s",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
 
@@ -115,51 +136,77 @@ fun CallMasterPlayerBar(
                             containerColor = RadiantGold,
                             contentColor = DarkGreen
                         ),
-                        modifier = Modifier.size(40.dp).testTag("player_play_pause_mini")
+                        modifier = Modifier.size(38.dp).testTag("player_play_pause_mini")
                     ) {
                         Icon(
                             imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Pause" else "Play"
+                            contentDescription = if (state.isPlaying) "Pause" else "Play",
+                            modifier = Modifier.size(22.dp)
                         )
                     }
 
                     IconButton(
                         onClick = { player.skipForward(10) },
-                        modifier = Modifier.size(36.dp).testTag("player_skip_fwd_mini")
+                        modifier = Modifier.size(34.dp).testTag("player_skip_fwd_mini")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Forward10,
                             contentDescription = "Skip +10s",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
 
                     IconButton(
-                        onClick = { player.stop() },
+                        onClick = { player.close() },
                         modifier = Modifier.size(32.dp).testTag("player_close_mini")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close player",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Mini progress indicator
-            val progress = if (state.durationMs > 0) {
-                (state.currentPositionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
-            } else 0f
-
-            CallMasterWaveform(
-                progress = progress,
-                barCount = 28,
-                modifier = Modifier.height(16.dp),
-                seed = recording.id.hashCode()
+            Slider(
+                value = state.currentPositionMs.toFloat(),
+                onValueChange = { player.seekTo(it.toInt()) },
+                valueRange = 0f..state.durationMs.toFloat().coerceAtLeast(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = RadiantGold,
+                    activeTrackColor = RadiantGold,
+                    inactiveTrackColor = PetroleumGreen
+                ),
+                modifier = Modifier.fillMaxWidth().height(20.dp).testTag("player_mini_slider")
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatDuration(state.currentPositionMs.toLong()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = if (state.isSpeakerphoneOn) "🔊 مكبر الصوت" else "👂 سماعة المكالمة",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (state.isSpeakerphoneOn) RadiantGold else LightGold,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = formatDuration(state.durationMs.toLong()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 
@@ -189,7 +236,8 @@ fun CallMasterPlayerDetailDialog(
                 .padding(8.dp)
                 .testTag("player_detail_dialog"),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.6f))
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),

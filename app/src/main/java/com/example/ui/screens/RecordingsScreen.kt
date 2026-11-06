@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,13 +22,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -49,9 +56,15 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,20 +80,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.example.R
-import com.example.data.CompletenessStatus
+import com.example.data.CallDirection
 import com.example.data.RecordingDao
 import com.example.data.RecordingEntity
 import com.example.data.RecordingSource
 import com.example.player.CallMasterAudioPlayer
 import com.example.ui.components.formatDuration
+import com.example.ui.theme.BorderGrayDark
 import com.example.ui.theme.DarkGreen
-import com.example.ui.theme.LightGold
 import com.example.ui.theme.PetroleumGreen
+import com.example.ui.theme.PlatinumPrimary
 import com.example.ui.theme.RadiantGold
-import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusSuccess
 import com.example.ui.theme.SurfaceDark
 import kotlinx.coroutines.launch
@@ -89,16 +101,30 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class ContactGroup(
+    val key: String,
+    val displayName: String,
+    val phoneNumber: String,
+    val recordings: List<RecordingEntity>,
+    val incomingCount: Int,
+    val outgoingCount: Int,
+    val totalDurationMs: Long,
+    val latestTimestamp: Long
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordingsScreen(
     recordingDao: RecordingDao,
     audioPlayer: CallMasterAudioPlayer,
-    onNavigateToAiWithRecording: (RecordingEntity) -> Unit
+    onNavigateToAiWithRecording: (RecordingEntity) -> Unit,
+    targetRecordingId: String? = null,
+    onClearTargetRecordingId: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    var viewMode by remember { mutableStateOf(0) } // 0 = All list, 1 = Grouped by Contact
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("ALL") }
 
@@ -115,6 +141,43 @@ fun RecordingsScreen(
         }
     } else {
         recordingDao.searchRecordings(searchQuery).collectAsState(initial = emptyList())
+    }
+
+    // Auto-focus and auto-play when triggered from post-call notification
+    LaunchedEffect(targetRecordingId, recordings) {
+        if (!targetRecordingId.isNullOrBlank() && recordings.isNotEmpty()) {
+            val matching = recordings.firstOrNull { it.id == targetRecordingId }
+            if (matching != null) {
+                audioPlayer.loadAndPlay(matching)
+                onClearTargetRecordingId()
+            }
+        }
+    }
+
+    // Compute automatic contact grouping and categorization
+    val contactGroups = remember(recordings) {
+        recordings.groupBy { rec ->
+            rec.contactNumber.ifBlank { rec.contactName.ifBlank { "مكالمة غير محددة" } }
+        }.map { (key, list) ->
+            val displayName = list.firstOrNull { it.contactName.isNotBlank() }?.contactName
+                ?: list.firstOrNull { it.contactNumber.isNotBlank() }?.contactNumber
+                ?: "مكالمة هاتفية"
+            val number = list.firstOrNull { it.contactNumber.isNotBlank() }?.contactNumber ?: ""
+            val incoming = list.count { it.callDirection == CallDirection.INCOMING }
+            val outgoing = list.count { it.callDirection == CallDirection.OUTGOING }
+            val totalDuration = list.sumOf { it.durationMs }
+            val latest = list.maxOfOrNull { it.startedAt } ?: 0L
+            ContactGroup(
+                key = key,
+                displayName = displayName,
+                phoneNumber = number,
+                recordings = list.sortedByDescending { it.startedAt },
+                incomingCount = incoming,
+                outgoingCount = outgoing,
+                totalDurationMs = totalDuration,
+                latestTimestamp = latest
+            )
+        }.sortedByDescending { it.latestTimestamp }
     }
 
     var recordingToEditNotes by remember { mutableStateOf<RecordingEntity?>(null) }
@@ -137,13 +200,52 @@ fun RecordingsScreen(
             fontWeight = FontWeight.Bold
         )
 
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // View Mode Switcher: All Recordings vs Grouped By Contact
+        TabRow(
+            selectedTabIndex = viewMode,
+            containerColor = SurfaceDark,
+            contentColor = RadiantGold,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[viewMode]),
+                    color = RadiantGold
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Tab(
+                selected = viewMode == 0,
+                onClick = { viewMode = 0 },
+                text = {
+                    Text(
+                        "قائمة التسجيلات (${recordings.size})",
+                        fontWeight = if (viewMode == 0) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            )
+            Tab(
+                selected = viewMode == 1,
+                onClick = { viewMode = 1 },
+                text = {
+                    Text(
+                        "حسب الأشخاص والأرقام (${contactGroups.size})",
+                        fontWeight = if (viewMode == 1) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            )
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         // Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search recordings, contacts, notes, transcripts...") },
+            placeholder = { Text("بحث في المكالمات، الأسماء، الملاحظات...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = RadiantGold) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
@@ -161,43 +263,44 @@ fun RecordingsScreen(
             modifier = Modifier.fillMaxWidth().testTag("search_recordings_input")
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Filter Chips Row
-        val filters = listOf(
-            Pair("ALL", "All"),
-            Pair("FAVORITES", "Favorites"),
-            Pair("CELLULAR", "Cellular"),
-            Pair("WHATSAPP", "WhatsApp"),
-            Pair("TELEGRAM", "Telegram"),
-            Pair("MESSENGER", "Messenger"),
-            Pair("SIGNAL", "Signal"),
-            Pair("MIC", "Voice Memo")
-        )
+        // Filter Chips Row (Shown in All Recordings view)
+        if (viewMode == 0) {
+            val filters = listOf(
+                Pair("ALL", "الكل"),
+                Pair("FAVORITES", "المفضلة"),
+                Pair("CELLULAR", "مكالمات خلوية"),
+                Pair("WHATSAPP", "واتساب"),
+                Pair("TELEGRAM", "تيليجرام"),
+                Pair("MESSENGER", "ماسنجر"),
+                Pair("SIGNAL", "سيجنال"),
+                Pair("MIC", "ملاحظة صوتية")
+            )
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(filters) { (key, label) ->
-                FilterChip(
-                    selected = selectedFilter == key,
-                    onClick = { selectedFilter = key },
-                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = RadiantGold,
-                        selectedLabelColor = DarkGreen,
-                        containerColor = SurfaceDark,
-                        labelColor = MaterialTheme.colorScheme.onSurface
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(filters) { (key, label) ->
+                    FilterChip(
+                        selected = selectedFilter == key,
+                        onClick = { selectedFilter = key },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = RadiantGold,
+                            selectedLabelColor = DarkGreen,
+                            containerColor = SurfaceDark,
+                            labelColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
             }
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Recordings List
+        // Content Area
         if (recordings.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().weight(1f),
@@ -212,18 +315,37 @@ fun RecordingsScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "No matching recordings found",
+                        text = "لا توجد تسجيلات مطابقة",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Try clearing filters or search terms.",
+                        text = "ستظهر التسجيلات تلقائياً بمجرد إجراء أو استقبال أي مكالمة.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+        } else if (viewMode == 1) {
+            // Grouped By Contact / Number View
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize().weight(1f)
+            ) {
+                items(contactGroups, key = { it.key }) { group ->
+                    ContactGroupCard(
+                        group = group,
+                        onPlay = { audioPlayer.loadAndPlay(it) },
+                        onNavigateToAi = { onNavigateToAiWithRecording(it) },
+                        onShare = { shareRecordingAudio(context, it) }
+                    )
+                }
+                item {
+                    Spacer(modifier = Modifier.height(90.dp))
+                }
+            }
         } else {
+            // All Flat Chronological List View
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize().weight(1f)
@@ -244,26 +366,7 @@ fun RecordingsScreen(
                         onAiAnalyze = {
                             onNavigateToAiWithRecording(item)
                         },
-                        onShare = {
-                            val file = File(item.filePath)
-                            if (file.exists()) {
-                                val uri = try {
-                                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                                } catch (_: Exception) {
-                                    null
-                                }
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "audio/*"
-                                    putExtra(Intent.EXTRA_SUBJECT, item.title)
-                                    putExtra(Intent.EXTRA_TEXT, "CallMaster: ${item.title}\n${item.notes}")
-                                    if (uri != null) {
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Audio Recording"))
-                            }
-                        },
+                        onShare = { shareRecordingAudio(context, item) },
                         onDelete = {
                             recordingToDelete = item
                         }
@@ -280,12 +383,12 @@ fun RecordingsScreen(
     recordingToEditNotes?.let { rec ->
         AlertDialog(
             onDismissRequest = { recordingToEditNotes = null },
-            title = { Text("Recording Notes", color = RadiantGold, fontWeight = FontWeight.Bold) },
+            title = { Text("ملاحظات المكالمة", color = RadiantGold, fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = notesText,
                     onValueChange = { notesText = it },
-                    label = { Text("Notes & Meeting Minutes") },
+                    label = { Text("أدخل ملخصك الخاص أو ملاحظات المحادثة") },
                     modifier = Modifier.fillMaxWidth().height(120.dp)
                 )
             },
@@ -299,12 +402,12 @@ fun RecordingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RadiantGold, contentColor = DarkGreen)
                 ) {
-                    Text("Save Notes")
+                    Text("حفظ الملاحظة")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { recordingToEditNotes = null }) {
-                    Text("Cancel")
+                    Text("إلغاء")
                 }
             }
         )
@@ -314,29 +417,225 @@ fun RecordingsScreen(
     recordingToDelete?.let { rec ->
         AlertDialog(
             onDismissRequest = { recordingToDelete = null },
-            title = { Text("Delete Recording?", color = StatusError, fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to permanently delete '${rec.title}'? This action cannot be undone.") },
+            title = { Text("حذف التسجيل", color = RadiantGold, fontWeight = FontWeight.Bold) },
+            text = {
+                Text("هل أنت متأكد من حذف هذا التسجيل؟ سيتم حذف الملف الصوتي نهائياً من ذاكرة الجهاز.")
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         scope.launch {
-                            val file = File(rec.filePath)
-                            if (file.exists()) file.delete()
+                            val f = File(rec.filePath)
+                            if (f.exists()) f.delete()
                             recordingDao.deleteRecording(rec)
                             recordingToDelete = null
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatusError, contentColor = androidx.compose.ui.graphics.Color.White)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
                 ) {
-                    Text("Delete Permanently")
+                    Text("تأكيد الحذف")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { recordingToDelete = null }) {
-                    Text("Cancel")
+                    Text("إلغاء")
                 }
             }
         )
+    }
+}
+
+@Composable
+fun ContactGroupCard(
+    group: ContactGroup,
+    onPlay: (RecordingEntity) -> Unit,
+    onNavigateToAi: (RecordingEntity) -> Unit,
+    onShare: (RecordingEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(PetroleumGreen),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = group.displayName.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = RadiantGold,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = group.displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (group.phoneNumber.isNotBlank() && group.phoneNumber != group.displayName) {
+                            Text(
+                                text = group.phoneNumber,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = RadiantGold
+                            )
+                        }
+                        Text(
+                            text = "${group.recordings.size} تسجيلات • ${group.incomingCount} وارد • ${group.outgoingCount} صادر • ${formatDuration(group.totalDurationMs)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (group.phoneNumber.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_DIAL).apply {
+                                    data = Uri.parse("tel:${group.phoneNumber}")
+                                }
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Phone,
+                                contentDescription = "Dial",
+                                tint = StatusSuccess
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (expanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    group.recordings.forEach { rec ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.background,
+                            border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    FilledIconButton(
+                                        onClick = { onPlay(rec) },
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = PetroleumGreen,
+                                            contentColor = RadiantGold
+                                        ),
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = "Play",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
+                                    Column {
+                                        val dateFmt = SimpleDateFormat("MMM d, yyyy • hh:mm a", Locale.getDefault())
+                                        Text(
+                                            text = dateFmt.format(Date(rec.startedAt)),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        val dirText = when (rec.callDirection) {
+                                            CallDirection.INCOMING -> "مكالمة واردة"
+                                            CallDirection.OUTGOING -> "مكالمة صادرة"
+                                            CallDirection.NONE -> rec.sourceType.name
+                                        }
+                                        Text(
+                                            text = "$dirText • ${formatDuration(rec.durationMs)} • ${formatStorageSize(rec.fileSize)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { onNavigateToAi(rec) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = "AI",
+                                            tint = RadiantGold,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onShare(rec) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Share,
+                                            contentDescription = "Share",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -357,6 +656,7 @@ fun RecordingFullItemCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -404,8 +704,14 @@ fun RecordingFullItemCard(
                                 color = RadiantGold
                             )
                         }
+                        val dirText = when (recording.callDirection) {
+                            CallDirection.INCOMING -> "واردة"
+                            CallDirection.OUTGOING -> "صادرة"
+                            CallDirection.NONE -> ""
+                        }
+                        val dirLabel = if (dirText.isNotBlank()) "$dirText • " else ""
                         Text(
-                            text = "$dateString • ${formatDuration(recording.durationMs)} • ${formatStorageSize(recording.fileSize)}",
+                            text = "$dirLabel$dateString • ${formatDuration(recording.durationMs)} • ${formatStorageSize(recording.fileSize)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -423,19 +729,14 @@ fun RecordingFullItemCard(
 
                     Box {
                         IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Options",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
                         }
-
                         DropdownMenu(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("AI Transcription & Summary") },
+                                text = { Text("تفريغ بالذكاء الاصطناعي (AI Analysis)") },
                                 leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = RadiantGold) },
                                 onClick = {
                                     menuExpanded = false
@@ -443,7 +744,7 @@ fun RecordingFullItemCard(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Edit Notes") },
+                                text = { Text("تعديل الملاحظات") },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Note, contentDescription = null) },
                                 onClick = {
                                     menuExpanded = false
@@ -451,7 +752,7 @@ fun RecordingFullItemCard(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Share / Export") },
+                                text = { Text("مشاركة / تصدير الصوت") },
                                 leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
                                 onClick = {
                                     menuExpanded = false
@@ -459,8 +760,8 @@ fun RecordingFullItemCard(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Delete", color = StatusError) },
-                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = StatusError) },
+                                text = { Text("حذف التسجيل", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                 onClick = {
                                     menuExpanded = false
                                     onDelete()
@@ -471,73 +772,76 @@ fun RecordingFullItemCard(
                 }
             }
 
-            // Bottom tags: Validation & Notes preview
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Validation tag
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            when (recording.validationStatus) {
-                                CompletenessStatus.TWO_SIDED -> StatusSuccess.copy(alpha = 0.15f)
-                                CompletenessStatus.AUTHORIZED_SYSTEM -> RadiantGold.copy(alpha = 0.15f)
-                                CompletenessStatus.MIC_ONLY -> PetroleumGreen.copy(alpha = 0.4f)
-                                CompletenessStatus.UNSUPPORTED -> StatusError.copy(alpha = 0.15f)
-                            }
-                        )
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+            // Notes preview if present
+            if (recording.notes.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.background,
+                    border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = when (recording.validationStatus) {
-                            CompletenessStatus.TWO_SIDED -> "Two-Sided Audio"
-                            CompletenessStatus.AUTHORIZED_SYSTEM -> "System Authorized"
-                            CompletenessStatus.MIC_ONLY -> "Microphone Only"
-                            CompletenessStatus.UNSUPPORTED -> "Invalid Audio"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = when (recording.validationStatus) {
-                            CompletenessStatus.TWO_SIDED -> StatusSuccess
-                            CompletenessStatus.AUTHORIZED_SYSTEM -> RadiantGold
-                            CompletenessStatus.MIC_ONLY -> LightGold
-                            CompletenessStatus.UNSUPPORTED -> StatusError
-                        },
-                        fontWeight = FontWeight.Bold
+                        text = "📝 ${recording.notes}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
 
-                if (recording.transcript != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(RadiantGold.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+            // AI transcript preview if present
+            if (!recording.transcript.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = PetroleumGreen.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = RadiantGold,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "AI Transcribed",
+                            text = "مفرغة بالذكاء الاصطناعي: ${recording.transcript.take(75)}...",
                             style = MaterialTheme.typography.labelSmall,
                             color = RadiantGold,
-                            fontWeight = FontWeight.Bold
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
             }
+        }
+    }
+}
 
-            if (recording.notes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = recording.notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+private fun shareRecordingAudio(context: android.content.Context, item: RecordingEntity) {
+    val file = File(item.filePath)
+    if (file.exists()) {
+        val uri = try {
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        } catch (_: Exception) {
+            null
+        }
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "audio/*"
+            putExtra(Intent.EXTRA_SUBJECT, item.title)
+            putExtra(Intent.EXTRA_TEXT, "CallMaster: ${item.title}\n${item.notes}")
+            if (uri != null) {
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         }
+        context.startActivity(Intent.createChooser(shareIntent, "Share Audio Recording"))
     }
 }

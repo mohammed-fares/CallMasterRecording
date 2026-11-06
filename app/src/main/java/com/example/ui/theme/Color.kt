@@ -2,30 +2,47 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// CallMaster Brand Identity Palette
-val PetroleumGreen = Color(0xFF0F4C47)
-val DarkGreen = Color(0xFF082C29)
-val LightGreen = Color(0xFF1A6B64)
-val RadiantGold = Color(0xFFD4AF37)
-val LightGold = Color(0xFFFFE699)
-val DarkGold = Color(0xFFA17C16)
+// =========================================================================
+// CallMaster Luxury Dark & Light Gray Monochrome / Platinum Design System
+// =========================================================================
 
-// Surface & Background Dark
-val BackgroundDark = Color(0xFF081B19)
-val SurfaceDark = Color(0xFF102522)
-val SurfaceVariantDark = Color(0xFF153430)
-val OnSurfaceDark = Color(0xFFE8F1EF)
-val OnSurfaceVariantDark = Color(0xFF9EBEB9)
+// Dark Gray & Graphite Foundation
+val CarbonDark = Color(0xFF0F1115)         // Deepest background graphite
+val GraphiteDark = Color(0xFF17191E)       // Primary dark surface
+val SteelSurfaceDark = Color(0xFF20232B)   // Card & component container
+val ElevatedGrayDark = Color(0xFF2B2F3A)   // Elevated cards, chips, active pills
+val BorderGrayDark = Color(0xFF383D4A)     // Modern crisp hairline dividers
 
-// Surface & Background Light
-val BackgroundLight = Color(0xFFF5F8F7)
-val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceVariantLight = Color(0xFFE5EEEB)
-val OnSurfaceLight = Color(0xFF0F2624)
-val OnSurfaceVariantLight = Color(0xFF4C6662)
+// Platinum & Silver Accents (Replacing Gold with Sleek Metallic Platinum/Silver)
+val PlatinumPrimary = Color(0xFFE5E7EB)    // Radiant silver/platinum primary
+val SilverPure = Color(0xFFF9FAFB)         // Bright pure silver highlight
+val MutedSlate = Color(0xFF9CA3AF)         // Secondary labels and subtitles
+val DeepSlate = Color(0xFF4B5563)          // Muted icons and inactive states
+val CharcoalAccent = Color(0xFF2D3139)     // Charcoal tonal button container
 
-// Status & Indicators
-val StatusSuccess = Color(0xFF2ECC71)
-val StatusWarning = Color(0xFFF39C12)
-val StatusError = Color(0xFFE74C3C)
-val StatusInfo = Color(0xFF3498DB)
+// Light Palette (Refined Studio Grays)
+val BackgroundLight = Color(0xFFF3F4F6)    // Studio soft light gray background
+val SurfaceLight = Color(0xFFFFFFFF)       // Crisp white cards
+val SurfaceVariantLight = Color(0xFFE5E7EB)// Subtle platinum container
+val BorderGrayLight = Color(0xFFD1D5DB)    // Clean card border in light mode
+val OnSurfaceLight = Color(0xFF111827)     // Deep obsidian charcoal text
+val OnSurfaceVariantLight = Color(0xFF4B5563) // Slate gray descriptive text
+
+// Semantic Status Colors (Crisp, High-contrast)
+val StatusSuccess = Color(0xFF10B981)      // Emerald Active
+val StatusWarning = Color(0xFFF59E0B)      // Amber Alert
+val StatusError = Color(0xFFEF4444)        // Coral Error
+val StatusInfo = Color(0xFF6B7280)         // Neutral Slate Info
+
+// Backward-Compatible Aliases (Mapped to the New Luxurious Dark/Light Gray Palette)
+val RadiantGold = PlatinumPrimary
+val LightGold = SilverPure
+val DarkGold = MutedSlate
+val PetroleumGreen = ElevatedGrayDark
+val DarkGreen = CarbonDark
+val LightGreen = SteelSurfaceDark
+val BackgroundDark = CarbonDark
+val SurfaceDark = GraphiteDark
+val SurfaceVariantDark = SteelSurfaceDark
+val OnSurfaceDark = SilverPure
+val OnSurfaceVariantDark = MutedSlate

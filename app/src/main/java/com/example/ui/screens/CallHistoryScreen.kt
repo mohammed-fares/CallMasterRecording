@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.CallLog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,6 +63,7 @@ import com.example.data.RecordingEntity
 import com.example.data.RecordingSource
 import com.example.player.CallMasterAudioPlayer
 import com.example.ui.components.formatDuration
+import com.example.ui.theme.BorderGrayDark
 import com.example.ui.theme.DarkGreen
 import com.example.ui.theme.PetroleumGreen
 import com.example.ui.theme.RadiantGold
@@ -305,6 +307,7 @@ fun CallHistoryScreen(
                         Card(
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                            border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(

@@ -72,13 +72,71 @@ class CallMasterRecordingService : Service() {
             }
             ACTION_STOP -> {
                 serviceScope.launch {
-                    recordingEngine.stopRecording()
+                    val savedEntity = recordingEngine.stopRecording()
                     stopForeground(STOP_FOREGROUND_REMOVE)
+                    if (savedEntity != null) {
+                        showPostCallNotification(savedEntity)
+                    }
                     stopSelf()
                 }
             }
         }
         return START_NOT_STICKY
+    }
+
+    private fun showPostCallNotification(recording: com.example.data.RecordingEntity) {
+        createPostCallNotificationChannel()
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_TARGET_RECORDING_ID, recording.id)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            recording.id.hashCode(),
+            openIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val dirLabel = when (recording.callDirection) {
+            CallDirection.INCOMING -> "مكالمة واردة"
+            CallDirection.OUTGOING -> "مكالمة صادرة"
+            CallDirection.NONE -> "تسجيل صوتي"
+        }
+        val who = if (recording.contactName.isNotBlank()) recording.contactName else recording.contactNumber.ifBlank { "مكالمة هاتفية" }
+        val durationSec = recording.durationMs / 1000
+        val durationFormatted = "%02d:%02d".format(durationSec / 60, durationSec % 60)
+
+        val notification = NotificationCompat.Builder(this, POST_CALL_CHANNEL_ID)
+            .setContentTitle("✅ تم تسجيل المكالمة: $who")
+            .setContentText("$dirLabel • المدة: $durationFormatted • اضغط للاستماع والتفريغ")
+            .setSmallIcon(R.drawable.callmaster_icon_1793923695483)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "تم حفظ المكالمة بنجاح في مجلد CallMaster.\nالطرف: $who\nالنوع: $dirLabel\nالمدة: $durationFormatted\nاضغط الآن للاستماع، التعديل أو التفريغ الذكي."
+                )
+            )
+            .build()
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(recording.id.hashCode(), notification)
+    }
+
+    private fun createPostCallNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                POST_CALL_CHANNEL_ID,
+                "CallMaster Post-Call Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notification shown upon completing a call recording"
+                enableVibration(true)
+            }
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
     }
 
     private fun buildNotification(statusText: String): Notification {
@@ -132,6 +190,7 @@ class CallMasterRecordingService : Service() {
 
     companion object {
         const val CHANNEL_ID = "callmaster_recording_channel"
+        const val POST_CALL_CHANNEL_ID = "callmaster_post_call_channel"
         const val NOTIFICATION_ID = 1001
 
         const val ACTION_START = "com.example.action.START_RECORDING"

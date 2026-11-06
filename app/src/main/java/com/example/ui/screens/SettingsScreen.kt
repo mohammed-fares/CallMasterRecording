@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Environment
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,12 +22,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
@@ -32,6 +40,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +52,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,20 +61,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.backup.GoogleDriveBackupManager
 import com.example.preferences.CallMasterPreferences
 import com.example.security.CallMasterSecurityManager
+import com.example.ui.theme.BorderGrayDark
 import com.example.ui.theme.DarkGreen
-import com.example.ui.theme.LightGold
+import com.example.ui.theme.ElevatedGrayDark
 import com.example.ui.theme.PetroleumGreen
+import com.example.ui.theme.PlatinumPrimary
 import com.example.ui.theme.RadiantGold
 import com.example.ui.theme.StatusSuccess
 import com.example.ui.theme.SurfaceDark
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -70,16 +89,35 @@ fun SettingsScreen(
     securityManager: CallMasterSecurityManager,
     onLanguageChange: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val driveManager = remember { GoogleDriveBackupManager.getInstance(context) }
+    val driveSyncState by driveManager.syncState.collectAsState()
+
     var isAutoRecord by remember { mutableStateOf(preferences.isAutoRecordEnabled) }
     var isQuietMode by remember { mutableStateOf(preferences.isQuietModeEnabled) }
     var currentLanguage by remember { mutableStateOf(preferences.appLanguage) }
     var currentTier by remember { mutableStateOf(preferences.subscriptionTier) }
     var isEncryptionEnabled by remember { mutableStateOf(preferences.isStorageEncryptionEnabled) }
 
+    // Recording scope & direction
+    var recordScope by remember { mutableStateOf(preferences.recordScope) }
+    var recordDirection by remember { mutableStateOf(preferences.recordDirection) }
+    var twoSidedBoost by remember { mutableStateOf(preferences.twoSidedAcousticBoost) }
+    var audioBitrate by remember { mutableStateOf(preferences.audioBitrate) }
+
+    // Google Drive
+    var isDriveAutoSync by remember { mutableStateOf(preferences.isGoogleDriveAutoSyncEnabled) }
+    var driveEmail by remember { mutableStateOf(preferences.googleDriveAccountEmail) }
+    var showDriveEmailDialog by remember { mutableStateOf(false) }
+
     var showQuietDialog by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
-    var showSubscriptionDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
+
+    val defaultStoragePath = remember {
+        val ext = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)
+        if (ext != null) File(ext, "CallMaster").absolutePath else File(context.filesDir, "recordings").absolutePath
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -99,161 +137,434 @@ fun SettingsScreen(
             )
         }
 
-        // Subscription Tier Banner
+        // ==========================================
+        // 1. Google Drive Automatic Cloud Backup Card
+        // ==========================================
         item {
+            SettingsSectionHeader(title = "المزامنة السحابية (Google Drive)")
+            Spacer(modifier = Modifier.height(6.dp))
+
             Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                modifier = Modifier.fillMaxWidth().clickable { showSubscriptionDialog = true }
+                border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(RadiantGold.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = RadiantGold)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(PetroleumGreen),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Cloud, contentDescription = null, tint = RadiantGold)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Google Drive Backup",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (driveEmail.isNotBlank()) driveEmail else "غير متصل بحساب Gmail",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (driveEmail.isNotBlank()) StatusSuccess else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+
+                        Button(
+                            onClick = { showDriveEmailDialog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PetroleumGreen,
+                                contentColor = RadiantGold
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(if (driveEmail.isNotBlank()) "تغيير الحساب" else "ربط Gmail")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Auto-sync switch
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (currentTier == "PREMIUM") "CallMaster PRO (Active)" else "CallMaster Free Tier",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = RadiantGold,
-                                fontWeight = FontWeight.Bold
+                                text = "مزامنة تلقائية للمكالمات على Google Drive",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = if (currentTier == "PREMIUM") "Unlimited AI transcription & encrypted backup" else "Tap to upgrade for cloud backup & AI analysis",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "إنشاء مجلد CallMaster وتخزين التسجيلات الصادرة والواردة تلقائياً فور انتهائها.",
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Switch(
+                            checked = isDriveAutoSync,
+                            onCheckedChange = {
+                                isDriveAutoSync = it
+                                preferences.isGoogleDriveAutoSyncEnabled = it
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DarkGreen,
+                                checkedTrackColor = RadiantGold,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                uncheckedTrackColor = SurfaceDark
+                            )
+                        )
                     }
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = RadiantGold)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Folder & Manual Sync Action
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { driveManager.syncAllPendingRecordings() },
+                            enabled = !driveSyncState.isSyncing,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = RadiantGold,
+                                contentColor = DarkGreen
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (driveSyncState.isSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = DarkGreen,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("جاري الرفع (${driveSyncState.syncedFiles}/${driveSyncState.totalFiles})")
+                            } else {
+                                Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("مزامنة الكل الآن")
+                            }
+                        }
+
+                        Button(
+                            onClick = { driveManager.openDriveFolder(context) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PetroleumGreen,
+                                contentColor = RadiantGold
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("فتح المجلد")
+                        }
+                    }
+
+                    if (driveSyncState.lastSyncTime > 0L) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val dateFmt = SimpleDateFormat("MMM d • hh:mm a", Locale.getDefault())
+                        Text(
+                            text = "آخر مزامنة ناجحة: ${dateFmt.format(Date(driveSyncState.lastSyncTime))}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
 
-        // Section: General
+        // ==========================================
+        // 2. Recording Scope & Source Settings
+        // ==========================================
         item {
-            SettingsSectionHeader(title = stringResource(R.string.section_general))
-        }
+            SettingsSectionHeader(title = "نطاق واتجاه تسجيل المكالمات (Recording Scope)")
+            Spacer(modifier = Modifier.height(6.dp))
 
-        item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column {
-                    SettingsActionRow(
-                        title = stringResource(R.string.setting_language),
-                        subtitle = if (currentLanguage == "ar") "العربية (Cairo Font)" else "English",
-                        icon = Icons.Default.Language,
-                        onClick = {
-                            val newLang = if (currentLanguage == "ar") "en" else "ar"
-                            currentLanguage = newLang
-                            preferences.appLanguage = newLang
-                            onLanguageChange(newLang)
-                        }
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "نطاق التسجيل المدعوم:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = recordScope == "ALL",
+                            onClick = {
+                                recordScope = "ALL"
+                                preferences.recordScope = "ALL"
+                            },
+                            label = { Text("جميع الاتصالات (كلاهما)") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        FilterChip(
+                            selected = recordScope == "CELLULAR_ONLY",
+                            onClick = {
+                                recordScope = "CELLULAR_ONLY"
+                                preferences.recordScope = "CELLULAR_ONLY"
+                            },
+                            label = { Text("الشبكة فقط") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        FilterChip(
+                            selected = recordScope == "VOIP_ONLY",
+                            onClick = {
+                                recordScope = "VOIP_ONLY"
+                                preferences.recordScope = "VOIP_ONLY"
+                            },
+                            label = { Text("تطبيقات المراسلة") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "اتجاه المكالمة المراد تسجيلها:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = recordDirection == "BOTH",
+                            onClick = {
+                                recordDirection = "BOTH"
+                                preferences.recordDirection = "BOTH"
+                            },
+                            label = { Text("الوارد والصادر (كلاهما)") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        FilterChip(
+                            selected = recordDirection == "INCOMING_ONLY",
+                            onClick = {
+                                recordDirection = "INCOMING_ONLY"
+                                preferences.recordDirection = "INCOMING_ONLY"
+                            },
+                            label = { Text("الوارد فقط") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        FilterChip(
+                            selected = recordDirection == "OUTGOING_ONLY",
+                            onClick = {
+                                recordDirection = "OUTGOING_ONLY"
+                                preferences.recordDirection = "OUTGOING_ONLY"
+                            },
+                            label = { Text("الصادر فقط") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Two-sided voice clarity boost
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "تسجيل صوت الطرفين (المتحدث والمستقبل)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "تفعيل المعالجة الصوتية VOICE_COMMUNICATION لإلغاء الصدى والتقاط كلا الطرفين بأعلى نقاء ووضوح.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = twoSidedBoost,
+                            onCheckedChange = {
+                                twoSidedBoost = it
+                                preferences.twoSidedAcousticBoost = it
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DarkGreen,
+                                checkedTrackColor = RadiantGold,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                uncheckedTrackColor = SurfaceDark
+                            )
+                        )
+                    }
                 }
             }
         }
 
-        // Section: Recording Preferences
+        // ==========================================
+        // 3. Dedicated Folder & Storage Management
+        // ==========================================
         item {
-            SettingsSectionHeader(title = stringResource(R.string.section_recording))
-        }
+            SettingsSectionHeader(title = "تخصيص مجلد التخزين وصيغة الصوت")
+            Spacer(modifier = Modifier.height(6.dp))
 
-        item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.setting_auto_record),
-                        subtitle = "Companion auto-record when cellular call answers",
-                        icon = Icons.Default.Mic,
-                        checked = isAutoRecord,
-                        onCheckedChange = {
-                            isAutoRecord = it
-                            preferences.isAutoRecordEnabled = it
-                        }
-                    )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Storage, contentDescription = null, tint = RadiantGold)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "مجلد حفظ التسجيلات على الهاتف:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.background,
+                        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = defaultStoragePath,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = RadiantGold,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
 
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.setting_quiet_mode),
-                        subtitle = "Minimize audible clicks and redundant alerts",
-                        icon = Icons.Default.Security,
-                        checked = isQuietMode,
-                        onCheckedChange = {
-                            isQuietMode = it
-                            preferences.isQuietModeEnabled = it
-                            if (it) showQuietDialog = true
-                        }
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "جودة وضغط الصوت:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = audioBitrate == 128000,
+                            onClick = {
+                                audioBitrate = 128000
+                                preferences.audioBitrate = 128000
+                            },
+                            label = { Text("AAC عالي النقاء (128 kbps)") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        FilterChip(
+                            selected = audioBitrate == 64000,
+                            onClick = {
+                                audioBitrate = 64000
+                                preferences.audioBitrate = 64000
+                            },
+                            label = { Text("مضغوط اقتصادي (64 kbps)") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantGold,
+                                selectedLabelColor = DarkGreen,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
                 }
             }
         }
 
-        // Section: Security & Encryption
+        // ==========================================
+        // 4. AI Transcription Configuration
+        // ==========================================
         item {
-            SettingsSectionHeader(title = stringResource(R.string.section_security))
-        }
+            SettingsSectionHeader(title = "محرك التفريغ بالذكاء الاصطناعي (Gemini AI)")
+            Spacer(modifier = Modifier.height(6.dp))
 
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.setting_encryption),
-                        subtitle = "Hardware-backed Android Keystore AES-256",
-                        icon = Icons.Default.Lock,
-                        checked = isEncryptionEnabled,
-                        onCheckedChange = {
-                            isEncryptionEnabled = it
-                            preferences.isStorageEncryptionEnabled = it
-                        }
-                    )
-
-                    SettingsActionRow(
-                        title = stringResource(R.string.setting_pin_lock),
-                        subtitle = if (preferences.pinHash.isNotBlank()) "PIN Configured & Active" else "Not set",
-                        icon = Icons.Default.Security,
-                        onClick = { showPinDialog = true }
-                    )
-                }
-            }
-        }
-
-        // Section: AI Assistant
-        item {
-            SettingsSectionHeader(title = "المساعد الذكي (AI Assistant)")
-        }
-
-        item {
             var showKeyInput by remember { mutableStateOf(false) }
             var currentKey by remember { mutableStateOf(preferences.geminiCustomApiKey) }
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -270,7 +581,7 @@ fun SettingsScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = if (currentKey.isNotBlank()) "المفتاح مفعل ونشط" else "اضغط لإدخال مفتاح Gemini API",
+                                    text = if (currentKey.isNotBlank()) "المفتاح مفعل ونشط" else "اضغط لإدخال أو تعديل المفتاح",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (currentKey.isNotBlank()) StatusSuccess else RadiantGold
                                 )
@@ -279,7 +590,7 @@ fun SettingsScreen(
 
                         Button(
                             onClick = { showKeyInput = !showKeyInput },
-                            colors = ButtonDefaults.buttonColors(containerColor = PetroleumGreen, contentColor = LightGold),
+                            colors = ButtonDefaults.buttonColors(containerColor = PetroleumGreen, contentColor = RadiantGold),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(if (showKeyInput) "إغلاق" else "تعديل")
@@ -304,34 +615,59 @@ fun SettingsScreen(
             }
         }
 
-        // Section: About & Privacy
+        // ==========================================
+        // 5. General & Security
+        // ==========================================
         item {
-            SettingsSectionHeader(title = stringResource(R.string.section_about))
-        }
+            SettingsSectionHeader(title = "التفضيلات العامة والأمان")
+            Spacer(modifier = Modifier.height(6.dp))
 
-        item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "CallMaster v1.0.0",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = RadiantGold,
-                        fontWeight = FontWeight.Bold
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    SettingsActionRow(
+                        title = stringResource(R.string.setting_language),
+                        subtitle = if (currentLanguage == "ar") "العربية (خط كايرو Cairo)" else "English",
+                        icon = Icons.Default.Language,
+                        onClick = {
+                            val newLang = if (currentLanguage == "ar") "en" else "ar"
+                            currentLanguage = newLang
+                            preferences.appLanguage = newLang
+                            onLanguageChange(newLang)
+                        }
                     )
-                    Text(
-                        text = "Native Android Call Recording Management & Intelligent Audio Platform.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.setting_auto_record),
+                        subtitle = "بدء التسجيل تلقائياً فور الرد على أي مكالمة",
+                        icon = Icons.Default.Mic,
+                        checked = isAutoRecord,
+                        onCheckedChange = {
+                            isAutoRecord = it
+                            preferences.isAutoRecordEnabled = it
+                        }
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Complies strictly with Google Play policies, Android microphone privacy guidelines, and transparent audio stream routing.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LightGold
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.setting_encryption),
+                        subtitle = "تشفير AES-256 للتسجيلات في ذاكرة الجهاز",
+                        icon = Icons.Default.Lock,
+                        checked = isEncryptionEnabled,
+                        onCheckedChange = {
+                            isEncryptionEnabled = it
+                            preferences.isStorageEncryptionEnabled = it
+                        }
+                    )
+
+                    SettingsActionRow(
+                        title = stringResource(R.string.setting_pin_lock),
+                        subtitle = if (preferences.pinHash.isNotBlank()) "رمز PIN مفعل ونشط" else "غير معين",
+                        icon = Icons.Default.Security,
+                        onClick = { showPinDialog = true }
                     )
                 }
             }
@@ -342,48 +678,24 @@ fun SettingsScreen(
         }
     }
 
-    // Quiet Mode Privacy Explanation Dialog (MANDATORY REQUIREMENT)
-    if (showQuietDialog) {
+    // Google Drive Email Config Dialog
+    if (showDriveEmailDialog) {
+        var emailInput by remember { mutableStateOf(driveEmail) }
         AlertDialog(
-            onDismissRequest = { showQuietDialog = false },
-            title = {
-                Text("Quiet Recording Experience", color = RadiantGold, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Text(
-                    text = "CallMaster Quiet Mode suppresses non-essential application sounds and redundant banners to keep your interface clean.\n\n" +
-                            "IMPORTANT PRIVACY DISCLOSURE:\n" +
-                            "• Android's operating system microphone indicator (green privacy dot) is a mandatory platform security safeguard and CANNOT and WILL NOT be hidden.\n" +
-                            "• CallMaster never conceals recording activity from the device owner or enables covert surveillance.\n" +
-                            "• Always notify and obtain lawful consent from all conversation participants.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showQuietDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = RadiantGold, contentColor = DarkGreen)
-                ) {
-                    Text("I Understand & Agree")
-                }
-            }
-        )
-    }
-
-    // PIN Setup Dialog
-    if (showPinDialog) {
-        AlertDialog(
-            onDismissRequest = { showPinDialog = false },
-            title = { Text("Configure PIN Lock", color = RadiantGold, fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showDriveEmailDialog = false },
+            title = { Text("ربط حساب Google Drive", color = RadiantGold, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Enter a 4-digit security PIN to protect local recordings:")
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "أدخل بريد Gmail الذي ترغب بربط التسجيلات عليه لإنشاء مجلد CallMaster والمزامنة التلقائية:",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
-                        value = pinInput,
-                        onValueChange = { if (it.length <= 6) pinInput = it },
+                        value = emailInput,
+                        onValueChange = { emailInput = it },
+                        label = { Text("بريد Gmail") },
+                        placeholder = { Text("your.email@gmail.com") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -392,55 +704,56 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (pinInput.isNotBlank()) {
-                            preferences.pinHash = securityManager.hashPin(pinInput)
-                            preferences.isPinLockEnabled = true
-                        }
-                        showPinDialog = false
+                        driveEmail = emailInput.trim()
+                        preferences.googleDriveAccountEmail = emailInput.trim()
+                        preferences.isGoogleDriveAutoSyncEnabled = true
+                        isDriveAutoSync = true
+                        showDriveEmailDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RadiantGold, contentColor = DarkGreen)
                 ) {
-                    Text("Save PIN")
+                    Text("حفظ وربط")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPinDialog = false }) {
-                    Text("Cancel")
+                TextButton(onClick = { showDriveEmailDialog = false }) {
+                    Text("إلغاء")
                 }
             }
         )
     }
 
-    // Subscription Comparison Dialog
-    if (showSubscriptionDialog) {
+    // PIN Dialog
+    if (showPinDialog) {
         AlertDialog(
-            onDismissRequest = { showSubscriptionDialog = false },
-            title = { Text("CallMaster Subscription", color = RadiantGold, fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showPinDialog = false },
+            title = { Text("تعيين رمز PIN", color = RadiantGold, fontWeight = FontWeight.Bold) },
             text = {
-                Column {
-                    Text("FREE TIER:", fontWeight = FontWeight.Bold, color = LightGold)
-                    Text("• Local recording library & audio playback\n• Device compatibility reports\n• Local Keystore AES-256 encryption")
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("PREMIUM PRO TIER:", fontWeight = FontWeight.Bold, color = RadiantGold)
-                    Text("• Full AI Audio Transcription (Arabic & English)\n• Executive summaries & Action Item extraction\n• Encrypted cloud backup integration\n• Bulk export & advanced search")
-                }
+                OutlinedTextField(
+                    value = pinInput,
+                    onValueChange = { if (it.length <= 6) pinInput = it },
+                    label = { Text("رمز PIN (4-6 أرقام)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val newTier = if (currentTier == "FREE") "PREMIUM" else "FREE"
-                        currentTier = newTier
-                        preferences.subscriptionTier = newTier
-                        showSubscriptionDialog = false
+                        if (pinInput.length >= 4) {
+                            preferences.pinHash = securityManager.hashPin(pinInput)
+                            preferences.isPinLockEnabled = true
+                            showPinDialog = false
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RadiantGold, contentColor = DarkGreen)
                 ) {
-                    Text(if (currentTier == "FREE") "Switch to PRO (Simulated)" else "Switch to FREE")
+                    Text("حفظ الرمز")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSubscriptionDialog = false }) {
-                    Text("Close")
+                TextButton(onClick = { showPinDialog = false }) {
+                    Text("إلغاء")
                 }
             }
         )
@@ -451,10 +764,10 @@ fun SettingsScreen(
 fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.labelLarge,
         color = RadiantGold,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
     )
 }
 
@@ -469,7 +782,8 @@ fun SettingsSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -477,11 +791,25 @@ fun SettingsSwitchRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = RadiantGold, modifier = Modifier.size(22.dp))
-            Spacer(modifier = Modifier.width(12.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = RadiantGold,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
             Column {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         Switch(
@@ -489,7 +817,9 @@ fun SettingsSwitchRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = DarkGreen,
-                checkedTrackColor = RadiantGold
+                checkedTrackColor = RadiantGold,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = SurfaceDark
             )
         )
     }
@@ -506,7 +836,7 @@ fun SettingsActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -514,13 +844,26 @@ fun SettingsActionRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = RadiantGold, modifier = Modifier.size(22.dp))
-            Spacer(modifier = Modifier.width(12.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = RadiantGold,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
             Column {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

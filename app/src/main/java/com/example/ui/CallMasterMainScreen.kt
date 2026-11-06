@@ -9,6 +9,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -104,7 +106,9 @@ fun CallMasterMainScreen(
     audioPlayer: CallMasterAudioPlayer,
     preferences: CallMasterPreferences,
     securityManager: CallMasterSecurityManager,
-    aiEngine: CallMasterAiEngine
+    aiEngine: CallMasterAiEngine,
+    targetRecordingId: String? = null,
+    onClearTargetRecordingId: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var hasCompletedOnboarding by remember { mutableStateOf(preferences.hasCompletedOnboarding) }
@@ -113,6 +117,13 @@ fun CallMasterMainScreen(
     var showCompatibilityDetail by remember { mutableStateOf(false) }
     var preselectedAiRecording by remember { mutableStateOf<RecordingEntity?>(null) }
     var appLanguage by remember { mutableStateOf(preferences.appLanguage) }
+
+    // Switch to recordings tab immediately when opening from a post-call notification
+    LaunchedEffect(targetRecordingId) {
+        if (!targetRecordingId.isNullOrBlank()) {
+            currentTab = MainNavTab.RECORDINGS
+        }
+    }
 
     var hasAllPermissions by remember {
         mutableStateOf(
@@ -205,127 +216,139 @@ fun CallMasterMainScreen(
                     }
                 }
             ) { innerPadding ->
-                Column(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    // Permission Banner if missing
-                    if (!hasAllPermissions) {
-                        Surface(
-                            color = RadiantGold.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    val isWide = maxWidth > 680.dp
+                    val hMargin = if (isWide) 24.dp else 0.dp
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = hMargin)
+                            .widthIn(max = 760.dp)
+                            .align(Alignment.TopCenter)
+                    ) {
+                        // Permission Banner if missing
+                        if (!hasAllPermissions) {
+                            Surface(
+                                color = RadiantGold.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
                             ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Security,
-                                        contentDescription = null,
-                                        tint = RadiantGold,
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    )
-                                    Column {
-                                        Text(
-                                            text = "تفعيل أذونات تسجيل المكالمات",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = RadiantGold,
-                                            fontWeight = FontWeight.Bold
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Security,
+                                            contentDescription = null,
+                                            tint = RadiantGold,
+                                            modifier = Modifier.padding(end = 8.dp)
                                         )
-                                        Text(
-                                            text = "مطلوبة للتسجيل التلقائي فور الرد وربط أسماء جهات الاتصال.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                        Column {
+                                            Text(
+                                                text = "تفعيل أذونات تسجيل المكالمات",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = RadiantGold,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "مطلوبة للتسجيل التلقائي فور الرد وربط أسماء جهات الاتصال.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                    Button(
+                                        onClick = {
+                                            val perms = mutableListOf(
+                                                Manifest.permission.RECORD_AUDIO,
+                                                Manifest.permission.READ_PHONE_STATE,
+                                                Manifest.permission.READ_CALL_LOG,
+                                                Manifest.permission.READ_CONTACTS
+                                            )
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                                            }
+                                            permissionLauncher.launch(perms.toTypedArray())
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = RadiantGold,
+                                            contentColor = DarkGreen
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("تفعيل الآن")
+                                    }
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (showCompatibilityDetail) {
+                                CompatibilityScreen(compatibilityEngine = compatibilityEngine)
+                            } else {
+                                Crossfade(targetState = currentTab, label = "tab_fade") { tab ->
+                                    when (tab) {
+                                        MainNavTab.HOME -> HomeScreen(
+                                            recordingDao = database.recordingDao(),
+                                            recordingEngine = recordingEngine,
+                                            audioPlayer = audioPlayer,
+                                            preferences = preferences,
+                                            report = compatibilityEngine.generateReport(),
+                                            onNavigateToRecordings = { currentTab = MainNavTab.RECORDINGS },
+                                            onNavigateToCalls = { currentTab = MainNavTab.CALLS },
+                                            onNavigateToAi = { currentTab = MainNavTab.AI },
+                                            onNavigateToCompatibility = { showCompatibilityDetail = true },
+                                            onStartRecordingClick = { showActiveRecordingDialog = true }
+                                        )
+                                        MainNavTab.RECORDINGS -> RecordingsScreen(
+                                            recordingDao = database.recordingDao(),
+                                            audioPlayer = audioPlayer,
+                                            targetRecordingId = targetRecordingId,
+                                            onClearTargetRecordingId = onClearTargetRecordingId,
+                                            onNavigateToAiWithRecording = { rec ->
+                                                preselectedAiRecording = rec
+                                                currentTab = MainNavTab.AI
+                                            }
+                                        )
+                                        MainNavTab.CALLS -> CallHistoryScreen(
+                                            recordingDao = database.recordingDao(),
+                                            audioPlayer = audioPlayer,
+                                            onStartRecordingClick = { showActiveRecordingDialog = true }
+                                        )
+                                        MainNavTab.AI -> AiAssistantScreen(
+                                            aiEngine = aiEngine,
+                                            recordingDao = database.recordingDao(),
+                                            audioPlayer = audioPlayer,
+                                            preSelectedRecording = preselectedAiRecording
+                                        )
+                                        MainNavTab.SETTINGS -> SettingsScreen(
+                                            preferences = preferences,
+                                            securityManager = securityManager,
+                                            onLanguageChange = { newLang ->
+                                                appLanguage = newLang
+                                            }
                                         )
                                     }
                                 }
-                                Button(
-                                    onClick = {
-                                        val perms = mutableListOf(
-                                            Manifest.permission.RECORD_AUDIO,
-                                            Manifest.permission.READ_PHONE_STATE,
-                                            Manifest.permission.READ_CALL_LOG,
-                                            Manifest.permission.READ_CONTACTS
-                                        )
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            perms.add(Manifest.permission.POST_NOTIFICATIONS)
-                                        }
-                                        permissionLauncher.launch(perms.toTypedArray())
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = RadiantGold,
-                                        contentColor = DarkGreen
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text("تفعيل الآن")
-                                }
                             }
-                        }
-                    }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (showCompatibilityDetail) {
-                            CompatibilityScreen(compatibilityEngine = compatibilityEngine)
-                        } else {
-                            Crossfade(targetState = currentTab, label = "tab_fade") { tab ->
-                                when (tab) {
-                                    MainNavTab.HOME -> HomeScreen(
-                                        recordingDao = database.recordingDao(),
-                                        recordingEngine = recordingEngine,
-                                        audioPlayer = audioPlayer,
-                                        preferences = preferences,
-                                        report = compatibilityEngine.generateReport(),
-                                        onNavigateToRecordings = { currentTab = MainNavTab.RECORDINGS },
-                                        onNavigateToCalls = { currentTab = MainNavTab.CALLS },
-                                        onNavigateToAi = { currentTab = MainNavTab.AI },
-                                        onNavigateToCompatibility = { showCompatibilityDetail = true },
-                                        onStartRecordingClick = { showActiveRecordingDialog = true }
-                                    )
-                                    MainNavTab.RECORDINGS -> RecordingsScreen(
-                                        recordingDao = database.recordingDao(),
-                                        audioPlayer = audioPlayer,
-                                        onNavigateToAiWithRecording = { rec ->
-                                            preselectedAiRecording = rec
-                                            currentTab = MainNavTab.AI
-                                        }
-                                    )
-                                    MainNavTab.CALLS -> CallHistoryScreen(
-                                        recordingDao = database.recordingDao(),
-                                        audioPlayer = audioPlayer,
-                                        onStartRecordingClick = { showActiveRecordingDialog = true }
-                                    )
-                                    MainNavTab.AI -> AiAssistantScreen(
-                                        aiEngine = aiEngine,
-                                        recordingDao = database.recordingDao(),
-                                        audioPlayer = audioPlayer,
-                                        preSelectedRecording = preselectedAiRecording
-                                    )
-                                    MainNavTab.SETTINGS -> SettingsScreen(
-                                        preferences = preferences,
-                                        securityManager = securityManager,
-                                        onLanguageChange = { newLang ->
-                                            appLanguage = newLang
-                                        }
-                                    )
-                                }
+                            if (showActiveRecordingDialog) {
+                                CallMasterActiveRecordingDialog(
+                                    engine = recordingEngine,
+                                    onDismiss = { showActiveRecordingDialog = false }
+                                )
                             }
-                        }
-
-                        if (showActiveRecordingDialog) {
-                            CallMasterActiveRecordingDialog(
-                                engine = recordingEngine,
-                                onDismiss = { showActiveRecordingDialog = false }
-                            )
                         }
                     }
                 }

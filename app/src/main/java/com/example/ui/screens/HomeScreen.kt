@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -71,6 +72,8 @@ import com.example.preferences.CallMasterPreferences
 import com.example.recording.CallMasterRecordingEngine
 import com.example.recording.RecordingEngineState
 import com.example.ui.components.formatDuration
+import com.example.backup.GoogleDriveBackupManager
+import com.example.ui.theme.BorderGrayDark
 import com.example.ui.theme.DarkGreen
 import com.example.ui.theme.LightGold
 import com.example.ui.theme.PetroleumGreen
@@ -462,6 +465,7 @@ fun StatCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -512,6 +516,7 @@ fun QuickActionButton(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         color = SurfaceDark,
+        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.4f)),
         tonalElevation = 2.dp,
         modifier = modifier.height(84.dp)
     ) {
@@ -550,6 +555,7 @@ fun RecordingItemCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        border = BorderStroke(1.dp, BorderGrayDark.copy(alpha = 0.5f)),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(

@@ -64,6 +64,48 @@ class CallMasterPreferences(context: Context) {
         get() = prefs.getString(KEY_GEMINI_API_KEY, "") ?: ""
         set(value) = prefs.edit().putString(KEY_GEMINI_API_KEY, value).apply()
 
+    // Scope of recording: "ALL", "CELLULAR_ONLY", "VOIP_ONLY"
+    var recordScope: String
+        get() = prefs.getString(KEY_RECORD_SCOPE, "ALL") ?: "ALL"
+        set(value) = prefs.edit().putString(KEY_RECORD_SCOPE, value).apply()
+
+    // Call Direction: "BOTH", "INCOMING_ONLY", "OUTGOING_ONLY"
+    var recordDirection: String
+        get() = prefs.getString(KEY_RECORD_DIRECTION, "BOTH") ?: "BOTH"
+        set(value) = prefs.edit().putString(KEY_RECORD_DIRECTION, value).apply()
+
+    // Two-sided acoustic voice clarity booster
+    var twoSidedAcousticBoost: Boolean
+        get() = prefs.getBoolean(KEY_TWO_SIDED_BOOST, true)
+        set(value) = prefs.edit().putBoolean(KEY_TWO_SIDED_BOOST, value).apply()
+
+    // Dedicated local folder path
+    var customStorageFolder: String
+        get() = prefs.getString(KEY_STORAGE_FOLDER, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_STORAGE_FOLDER, value).apply()
+
+    // Audio bitrate (bps): 128000 for standard/high clarity, 64000 for compact
+    var audioBitrate: Int
+        get() = prefs.getInt(KEY_AUDIO_BITRATE, 128000)
+        set(value) = prefs.edit().putInt(KEY_AUDIO_BITRATE, value).apply()
+
+    // Google Drive auto-sync settings
+    var isGoogleDriveAutoSyncEnabled: Boolean
+        get() = prefs.getBoolean(KEY_GDRIVE_AUTO_SYNC, false)
+        set(value) = prefs.edit().putBoolean(KEY_GDRIVE_AUTO_SYNC, value).apply()
+
+    var googleDriveAccountEmail: String
+        get() = prefs.getString(KEY_GDRIVE_EMAIL, "mf.z.hussein.pal@gmail.com") ?: "mf.z.hussein.pal@gmail.com"
+        set(value) = prefs.edit().putString(KEY_GDRIVE_EMAIL, value).apply()
+
+    var googleDriveFolderTitle: String
+        get() = prefs.getString(KEY_GDRIVE_FOLDER, "CallMaster Recordings") ?: "CallMaster Recordings"
+        set(value) = prefs.edit().putString(KEY_GDRIVE_FOLDER, value).apply()
+
+    var lastGoogleDriveSyncTimestamp: Long
+        get() = prefs.getLong(KEY_GDRIVE_LAST_SYNC, 0L)
+        set(value) = prefs.edit().putLong(KEY_GDRIVE_LAST_SYNC, value).apply()
+
     companion object {
         private const val KEY_AUTO_RECORD = "pref_auto_record"
         private const val KEY_QUIET_MODE = "pref_quiet_mode"
@@ -79,5 +121,14 @@ class CallMasterPreferences(context: Context) {
         private const val KEY_ONBOARDING_COMPLETED = "pref_onboarding_completed"
         private const val KEY_RETENTION_DAYS = "pref_retention_days"
         private const val KEY_GEMINI_API_KEY = "pref_gemini_api_key"
+        private const val KEY_RECORD_SCOPE = "pref_record_scope"
+        private const val KEY_RECORD_DIRECTION = "pref_record_direction"
+        private const val KEY_TWO_SIDED_BOOST = "pref_two_sided_boost"
+        private const val KEY_STORAGE_FOLDER = "pref_storage_folder"
+        private const val KEY_AUDIO_BITRATE = "pref_audio_bitrate"
+        private const val KEY_GDRIVE_AUTO_SYNC = "pref_gdrive_auto_sync"
+        private const val KEY_GDRIVE_EMAIL = "pref_gdrive_email"
+        private const val KEY_GDRIVE_FOLDER = "pref_gdrive_folder"
+        private const val KEY_GDRIVE_LAST_SYNC = "pref_gdrive_last_sync"
     }
 }

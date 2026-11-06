@@ -36,7 +36,21 @@ class CallStateReceiver : BroadcastReceiver() {
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
                 // Call answered or outgoing call started
                 if (prefs.isAutoRecordEnabled && engine.checkPermissions()) {
+                    // Check recording scope
+                    if (prefs.recordScope == "VOIP_ONLY") {
+                        return
+                    }
+
                     val direction = if (isIncomingCall) CallDirection.INCOMING else CallDirection.OUTGOING
+
+                    // Check recording direction
+                    if (prefs.recordDirection == "INCOMING_ONLY" && direction != CallDirection.INCOMING) {
+                        return
+                    }
+                    if (prefs.recordDirection == "OUTGOING_ONLY" && direction != CallDirection.OUTGOING) {
+                        return
+                    }
+
                     val numberToUse = if (savedNumber.isNotBlank()) savedNumber else rawNumber
                     val contactName = resolveContactName(context, numberToUse)
 

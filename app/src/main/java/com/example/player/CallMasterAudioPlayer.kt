@@ -1,6 +1,7 @@
 package com.example.player
 
 import android.content.Context
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
 import android.util.Log
@@ -23,12 +24,14 @@ data class PlayerState(
     val currentPositionMs: Int = 0,
     val durationMs: Int = 0,
     val playbackSpeed: Float = 1.0f,
+    val isSpeakerphoneOn: Boolean = true,
     val errorMessage: String? = null
 )
 
 class CallMasterAudioPlayer(private val context: Context) {
 
     private var mediaPlayer: MediaPlayer? = null
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
 
@@ -127,6 +130,34 @@ class CallMasterAudioPlayer(private val context: Context) {
         }
     }
 
+    fun toggleSpeakerphone() {
+        val target = !_playerState.value.isSpeakerphoneOn
+        setSpeakerphone(target)
+    }
+
+    fun setSpeakerphone(enabled: Boolean) {
+        try {
+            if (enabled) {
+                audioManager.mode = AudioManager.MODE_NORMAL
+                @Suppress("DEPRECATION")
+                audioManager.isSpeakerphoneOn = true
+            } else {
+                // Earpiece mode (سماعة المكالمة - كما تم في المكالمة)
+                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                @Suppress("DEPRECATION")
+                audioManager.isSpeakerphoneOn = false
+            }
+            _playerState.update { it.copy(isSpeakerphoneOn = enabled) }
+        } catch (e: Exception) {
+            Log.e("AudioPlayer", "Error routing audio to ${if (enabled) "speaker" else "earpiece"}", e)
+        }
+    }
+
+    fun close() {
+        stop()
+        _playerState.update { PlayerState() }
+    }
+
     fun stop() {
         stopProgressTracking()
         try {
@@ -134,7 +165,12 @@ class CallMasterAudioPlayer(private val context: Context) {
             mediaPlayer?.release()
         } catch (_: Exception) {}
         mediaPlayer = null
-        _playerState.update { it.copy(isPlaying = false) }
+        try {
+            audioManager.mode = AudioManager.MODE_NORMAL
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = true
+        } catch (_: Exception) {}
+        _playerState.update { it.copy(isPlaying = false, isSpeakerphoneOn = true) }
     }
 
     private fun startProgressTracking() {
