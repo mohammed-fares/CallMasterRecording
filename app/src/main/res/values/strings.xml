@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CallMaster</string>
+    <string name="tagline">Every Conversation, Organized.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_recordings">Recordings</string>
+    <string name="nav_calls">Call History</string>
+    <string name="nav_ai">AI Assistant</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Welcome to CallMaster</string>
+    <string name="onboarding_welcome_desc">The professional, secure, and intelligent call recording &amp; audio management platform.</string>
+    <string name="onboarding_capabilities_title">Supported Recording</string>
+    <string name="onboarding_capabilities_desc">Provides the maximum technically and legally supported recording for cellular and VoIP communications.</string>
+    <string name="onboarding_limitations_title">Platform Transparency</string>
+    <string name="onboarding_limitations_desc">We never simulate fake recording. Android permissions and security policies determine whether two-sided or microphone audio is captured.</string>
+    <string name="onboarding_privacy_title">Privacy &amp; Consent</string>
+    <string name="onboarding_privacy_desc">OS privacy indicators remain untouched. Always ensure consent from conversation participants before recording.</string>
+    <string name="onboarding_storage_title">Encrypted Storage</string>
+    <string name="onboarding_storage_desc">Your recordings stay local, stored in app-private storage with AES-256-GCM encryption capabilities.</string>
+    <string name="onboarding_check_title">Compatibility Check</string>
+    <string name="onboarding_check_desc">Analyze your device manufacturer, Android version, and audio hardware to determine exact recording capabilities.</string>
+    <string name="btn_next">Next</string>
+    <string name="btn_skip">Skip</string>
+    <string name="btn_get_started">Get Started</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">CallMaster Dashboard</string>
+    <string name="total_recordings">Total Recordings</string>
+    <string name="incoming_calls">Incoming</string>
+    <string name="outgoing_calls">Outgoing</string>
+    <string name="voip_recordings">VoIP Apps</string>
+    <string name="storage_used">Storage Used</string>
+    <string name="cloud_backup">Cloud Backup</string>
+    <string name="engine_status">Engine Status</string>
+    <string name="engine_ready">Ready (Active)</string>
+    <string name="engine_idle">Idle</string>
+    <string name="engine_recording">Recording in Progress</string>
+    <string name="device_compatibility">Compatibility Level</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="action_record">Record Audio</string>
+    <string name="action_check_compat">Run Diagnostic</string>
+    <string name="action_library">Open Library</string>
+    <string name="action_ai_transcribe">AI Transcription</string>
+    <string name="recent_recordings">Recent Recordings</string>
+    <string name="view_all">View All</string>
+
+    <!-- Recording Engine States -->
+    <string name="state_idle">Idle</string>
+    <string name="state_detected">Call Detected</string>
+    <string name="state_checking">Checking Compatibility</string>
+    <string name="state_waiting_consent">Waiting for Consent</string>
+    <string name="state_recording">Recording</string>
+    <string name="state_paused">Paused</string>
+    <string name="state_finalizing">Finalizing</string>
+    <string name="state_validating">Validating Audio</string>
+    <string name="state_saved">Saved Securely</string>
+    <string name="state_failed">Recording Failed</string>
+    <string name="state_unsupported">Source Unsupported</string>
+
+    <!-- Compatibility Levels -->
+    <string name="level_a_title">LEVEL A – Native Supported</string>
+    <string name="level_a_desc">Full two-sided recording supported via native device integration.</string>
+    <string name="level_b_title">LEVEL B – Authorized Alternative</string>
+    <string name="level_b_desc">Authorized system audio capture supported with user consent.</string>
+    <string name="level_c_title">LEVEL C – Partial Recording</string>
+    <string name="level_c_desc">Microphone audio only. Inbound party audio is limited by Android policy.</string>
+    <string name="level_d_title">LEVEL D – Unsupported</string>
+    <string name="level_d_desc">Direct recording is blocked by platform security constraints.</string>
+
+    <!-- Sources -->
+    <string name="source_cellular">Cellular Call</string>
+    <string name="source_whatsapp">WhatsApp Voice</string>
+    <string name="source_messenger">Facebook Messenger</string>
+    <string name="source_telegram">Telegram Call</string>
+    <string name="source_signal">Signal Call</string>
+    <string name="source_mic">Voice Memo / Mic</string>
+    <string name="source_other_voip">Other VoIP</string>
+
+    <!-- Completeness Status -->
+    <string name="completeness_two_sided">Two-Sided Call</string>
+    <string name="completeness_mic_only">Microphone Only</string>
+    <string name="completeness_authorized_system">System Authorized</string>
+    <string name="completeness_unsupported">Unsupported Source</string>
+
+    <!-- Audio Player -->
+    <string name="player_title">Audio Player</string>
+    <string name="speed_1x">1.0x</string>
+    <string name="speed_1_5x">1.5x</string>
+    <string name="speed_2x">2.0x</string>
+    <string name="skip_10s_fwd">+10s</string>
+    <string name="skip_10s_bwd">-10s</string>
+
+    <!-- AI Assistant -->
+    <string name="ai_title">CallMaster AI Assistant</string>
+    <string name="ai_subtitle">Intelligent Transcription &amp; Analysis</string>
+    <string name="ai_disclaimer">Audio processing respects privacy. User approval is required before running AI analysis.</string>
+    <string name="ai_transcription">Transcription</string>
+    <string name="ai_summary">Executive Summary</string>
+    <string name="ai_key_points">Key Points</string>
+    <string name="ai_action_items">Action Items</string>
+    <string name="ai_language_ar">Arabic (Standard &amp; Egyptian)</string>
+    <string name="ai_language_en">English</string>
+    <string name="ai_process_now">Analyze Recording with AI</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="section_general">General</string>
+    <string name="section_recording">Recording Preferences</string>
+    <string name="section_storage">Storage &amp; Backup</string>
+    <string name="section_security">Security &amp; Encryption</string>
+    <string name="section_ai">AI Assistant</string>
+    <string name="section_subscription">Subscription &amp; Plans</string>
+    <string name="section_about">About &amp; Diagnostics</string>
+
+    <string name="setting_language">App Language</string>
+    <string name="setting_dark_theme">Dark Theme</string>
+    <string name="setting_auto_record">Auto-Record Cellular Calls</string>
+    <string name="setting_quiet_mode">Quiet Recording Experience</string>
+    <string name="setting_quiet_mode_desc">Minimizes app sound effects and redundant alerts without hiding OS microphone privacy indicators.</string>
+    <string name="setting_audio_quality">Audio Quality</string>
+    <string name="setting_audio_format">Format (M4A / AAC / WAV)</string>
+    <string name="setting_pin_lock">PIN Protection</string>
+    <string name="setting_biometrics">Biometric Unlock</string>
+    <string name="setting_encryption">AES-256 Storage Encryption</string>
+
+    <!-- Subscriptions -->
+    <string name="plan_free">CallMaster Free</string>
+    <string name="plan_premium">CallMaster Premium (PRO)</string>
+    <string name="tier_status">Current Tier: %1$s</string>
+    <string name="upgrade_premium">Upgrade to Premium</string>
+</resources>

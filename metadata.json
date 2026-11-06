@@ -1,0 +1,6 @@
+{
+  "name": "CallMaster",
+  "description": "Professional call recording management, audio library, AI transcription, and secure storage platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

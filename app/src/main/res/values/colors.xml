@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="petroleum_green">#0F4C47</color>
+    <color name="dark_green">#082C29</color>
+    <color name="light_green">#1A6B64</color>
+    <color name="radiant_gold">#D4AF37</color>
+    <color name="light_gold">#FFE699</color>
+    <color name="dark_gold">#A17C16</color>
+    <color name="background_dark">#081B19</color>
+    <color name="surface_dark">#102522</color>
+    <color name="background_light">#F5F8F7</color>
+    <color name="surface_light">#FFFFFF</color>
+</resources>

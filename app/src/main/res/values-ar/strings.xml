@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">كول ماستر</string>
+    <string name="tagline">كل محادثة، منظمة.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">الرئيسية</string>
+    <string name="nav_recordings">التسجيلات</string>
+    <string name="nav_calls">سجل المكالمات</string>
+    <string name="nav_ai">المساعد الذكي</string>
+    <string name="nav_settings">الإعدادات</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">مرحباً بك في كول ماستر</string>
+    <string name="onboarding_welcome_desc">المنصة الاحترافية والآمنة والذكية لإدارة وتسجيل المكالمات والملفات الصوتية.</string>
+    <string name="onboarding_capabilities_title">إمكانيات التسجيل المدعومة</string>
+    <string name="onboarding_capabilities_desc">نقدم أقصى إمكانيات التسجيل المدعومة تقنياً ونظامياً للمكالمات الخلوية وتطبيقات الإنترنت.</string>
+    <string name="onboarding_limitations_title">الشفافية والأمان في أندرويد</string>
+    <string name="onboarding_limitations_desc">لا نقوم بتزييف أي تسجيل مطلقاً. سياسات حماية الخصوصية في أندرويد تحدد ما إذا كان التسجيل لطرفين أم للميكروفون فقط.</string>
+    <string name="onboarding_privacy_title">الخصوصية والموافقة القانونية</string>
+    <string name="onboarding_privacy_desc">مؤشرات خصوصية الميكروفون في النظام تظل ظاهرة دائماً. يرجى الحصول على موافقة الأطراف قبل التسجيل.</string>
+    <string name="onboarding_storage_title">تخزين محلي مشفر</string>
+    <string name="onboarding_storage_desc">تسجيلاتك محفوظة محلياً داخل مساحة التطبيق الخاصة مع دعم التشفير القوي AES-256-GCM.</string>
+    <string name="onboarding_check_title">فحص توافق الجهاز</string>
+    <string name="onboarding_check_desc">فحص دقيق لمصنع الجهاز، إصدار أندرويد، ومكونات الصوت لتحديد إمكانيات التسجيل الحقيقية بدقة.</string>
+    <string name="btn_next">التالي</string>
+    <string name="btn_skip">تخطي</string>
+    <string name="btn_get_started">ابدأ الآن</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">لوحة تحكم كول ماستر</string>
+    <string name="total_recordings">إجمالي التسجيلات</string>
+    <string name="incoming_calls">المكالمات الواردة</string>
+    <string name="outgoing_calls">المكالمات الصادرة</string>
+    <string name="voip_recordings">تطبيقات الإنترنت</string>
+    <string name="storage_used">المساحة المستهلكة</string>
+    <string name="cloud_backup">النسخ الاحتياطي</string>
+    <string name="engine_status">حالة المحرك</string>
+    <string name="engine_ready">جاهز (نشط)</string>
+    <string name="engine_idle">خامل</string>
+    <string name="engine_recording">جاري التسجيل الآن</string>
+    <string name="device_compatibility">مستوى التوافق</string>
+    <string name="quick_actions">إجراءات سريعة</string>
+    <string name="action_record">تسجيل صوتي</string>
+    <string name="action_check_compat">فحص التوافق</string>
+    <string name="action_library">مكتبة التسجيلات</string>
+    <string name="action_ai_transcribe">التفريغ بالذكاء الاصطناعي</string>
+    <string name="recent_recordings">أحدث التسجيلات</string>
+    <string name="view_all">عرض الكل</string>
+
+    <!-- Recording Engine States -->
+    <string name="state_idle">خامل</string>
+    <string name="state_detected">تم اكتشاف مكالمة</string>
+    <string name="state_checking">فحص التوافق</string>
+    <string name="state_waiting_consent">في انتظار الموافقة</string>
+    <string name="state_recording">جاري التسجيل</string>
+    <string name="state_paused">متوقف مؤقتاً</string>
+    <string name="state_finalizing">إنهاء التسجيل</string>
+    <string name="state_validating">التحقق من سلامة الصوت</string>
+    <string name="state_saved">محفوظ بأمان</string>
+    <string name="state_failed">فشل التسجيل</string>
+    <string name="state_unsupported">المصدر غير مدعوم</string>
+
+    <!-- Compatibility Levels -->
+    <string name="level_a_title">المستوى أ – تسجيل أصلي مدعوم</string>
+    <string name="level_a_desc">تسجيل كامل لطرفي المكالمة مدعوم عبر توافق النظام والجهاز.</string>
+    <string name="level_b_title">المستوى ب – تسجيل بديل مرخص</string>
+    <string name="level_b_desc">التقاط صوت النظام المصرح به مع موافقة المستخدم الصريحة.</string>
+    <string name="level_c_title">المستوى ج – تسجيل جزئي</string>
+    <string name="level_c_desc">صوت الميكروفون فقط. صوت الطرف الآخر مقيد بقيود أندرويد الصارمة.</string>
+    <string name="level_d_title">المستوى د – غير مدعوم</string>
+    <string name="level_d_desc">التسجيل المباشر محظور تماماً بموجب سياسات حماية الجهاز والنظام.</string>
+
+    <!-- Sources -->
+    <string name="source_cellular">مكالمة هاتفية خلوية</string>
+    <string name="source_whatsapp">مكالمة واتساب</string>
+    <string name="source_messenger">مكالمة ماسنجر</string>
+    <string name="source_telegram">مكالمة تيليجرام</string>
+    <string name="source_signal">مكالمة سيجنال</string>
+    <string name="source_mic">تسجيل صوتي / ميكروفون</string>
+    <string name="source_other_voip">تطبيقات اتصال أخرى</string>
+
+    <!-- Completeness Status -->
+    <string name="completeness_two_sided">تسجيل الطرفين</string>
+    <string name="completeness_mic_only">ميكروفون فقط</string>
+    <string name="completeness_authorized_system">نظام مصرح به</string>
+    <string name="completeness_unsupported">مصدر غير مدعوم</string>
+
+    <!-- Audio Player -->
+    <string name="player_title">مشغل الصوت الاحترافي</string>
+    <string name="speed_1x">1.0x</string>
+    <string name="speed_1_5x">1.5x</string>
+    <string name="speed_2x">2.0x</string>
+    <string name="skip_10s_fwd">+10 ث</string>
+    <string name="skip_10s_bwd">-10 ث</string>
+
+    <!-- AI Assistant -->
+    <string name="ai_title">مساعد كول ماستر الذكي</string>
+    <string name="ai_subtitle">التفريغ والتحليل الصوتي الذكي</string>
+    <string name="ai_disclaimer">معالجة الصوت تضمن الخصوصية الكاملة. موافقتك مطلوبة قبل إجراء أي تحليل ذكي.</string>
+    <string name="ai_transcription">التفريغ الصوتي</string>
+    <string name="ai_summary">الملخص التنفيذي</string>
+    <string name="ai_key_points">أهم النقاط</string>
+    <string name="ai_action_items">بنود العمل والمهام</string>
+    <string name="ai_language_ar">العربية (الفصحى واللهجة المصرية)</string>
+    <string name="ai_language_en">الإنجليزية</string>
+    <string name="ai_process_now">تحليل التسجيل بالذكاء الاصطناعي</string>
+
+    <!-- Settings -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="section_general">عام</string>
+    <string name="section_recording">تفضيلات التسجيل</string>
+    <string name="section_storage">التخزين والنسخ الاحتياطي</string>
+    <string name="section_security">الأمان والتشفير</string>
+    <string name="section_ai">المساعد الذكي</string>
+    <string name="section_subscription">الاشتراكات والترقية</string>
+    <string name="section_about">حول التطبيق والتشخيص</string>
+
+    <string name="setting_language">لغة التطبيق</string>
+    <string name="setting_dark_theme">المظهر الداكن (Dark Mode)</string>
+    <string name="setting_auto_record">التسجيل التلقائي للمكالمات الخلوية</string>
+    <string name="setting_quiet_mode">تجربة التسجيل الهادئة (Quiet Experience)</string>
+    <string name="setting_quiet_mode_desc">تقليل التنبيهات المكررة والمؤثرات الصوتية دون المساس بمؤشرات خصوصية أندرويد النظامية.</string>
+    <string name="setting_audio_quality">جودة الصوت</string>
+    <string name="setting_audio_format">صيغة الملف (M4A / AAC / WAV)</string>
+    <string name="setting_pin_lock">قفل برقم سري (PIN)</string>
+    <string name="setting_biometrics">بصمة الإصبع والوجه</string>
+    <string name="setting_encryption">تشفير التخزين AES-256</string>
+
+    <!-- Subscriptions -->
+    <string name="plan_free">كول ماستر المجاني</string>
+    <string name="plan_premium">كول ماستر برو (Premium)</string>
+    <string name="tier_status">الباقة الحالية: %1$s</string>
+    <string name="upgrade_premium">الترقية إلى باقة برو</string>
+</resources>
