@@ -38,9 +38,17 @@ class CallMasterRecordingService : Service() {
                 val sourceName = intent?.getStringExtra(EXTRA_SOURCE) ?: RecordingSource.MIC.name
                 val contactName = intent?.getStringExtra(EXTRA_CONTACT_NAME) ?: ""
                 val contactNumber = intent?.getStringExtra(EXTRA_CONTACT_NUMBER) ?: ""
+                val directionName = intent?.getStringExtra(EXTRA_DIRECTION) ?: CallDirection.NONE.name
                 val source = runCatching { RecordingSource.valueOf(sourceName) }.getOrDefault(RecordingSource.MIC)
+                val direction = runCatching { CallDirection.valueOf(directionName) }.getOrDefault(CallDirection.NONE)
 
-                val notification = buildNotification("Recording in progress ($sourceName)")
+                val dirLabel = when (direction) {
+                    CallDirection.INCOMING -> "Incoming Call"
+                    CallDirection.OUTGOING -> "Outgoing Call"
+                    CallDirection.NONE -> sourceName
+                }
+
+                val notification = buildNotification("Recording $dirLabel (${if (contactName.isNotBlank()) contactName else "Active"})")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     startForeground(
                         NOTIFICATION_ID,
@@ -59,7 +67,7 @@ class CallMasterRecordingService : Service() {
                     source = source,
                     contactName = contactName,
                     contactNumber = contactNumber,
-                    direction = CallDirection.NONE
+                    direction = direction
                 )
             }
             ACTION_STOP -> {
@@ -95,12 +103,12 @@ class CallMasterRecordingService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("CallMaster Recording Engine")
+            .setContentTitle("CallMaster Call Recorder")
             .setContentText(statusText)
             .setSmallIcon(R.drawable.callmaster_icon_1793923695483)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .addAction(android.R.drawable.ic_media_pause, "Stop & Save", stopPendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, "Save Recording", stopPendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
@@ -112,7 +120,7 @@ class CallMasterRecordingService : Service() {
                 "CallMaster Active Recording",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Foreground notifications during active audio capture"
+                description = "Foreground notifications during active call recording"
                 setShowBadge(false)
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -132,13 +140,21 @@ class CallMasterRecordingService : Service() {
         const val EXTRA_SOURCE = "extra_source"
         const val EXTRA_CONTACT_NAME = "extra_contact_name"
         const val EXTRA_CONTACT_NUMBER = "extra_contact_number"
+        const val EXTRA_DIRECTION = "extra_direction"
 
-        fun start(context: Context, source: RecordingSource, contactName: String = "", contactNumber: String = "") {
+        fun start(
+            context: Context,
+            source: RecordingSource,
+            contactName: String = "",
+            contactNumber: String = "",
+            direction: CallDirection = CallDirection.NONE
+        ) {
             val intent = Intent(context, CallMasterRecordingService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_SOURCE, source.name)
                 putExtra(EXTRA_CONTACT_NAME, contactName)
                 putExtra(EXTRA_CONTACT_NUMBER, contactNumber)
+                putExtra(EXTRA_DIRECTION, direction.name)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)

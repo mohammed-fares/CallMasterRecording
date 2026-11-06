@@ -248,12 +248,16 @@ fun OnboardingScreen(
                     onClick = {
                         // Request permissions when reaching step 4 (microphone privacy)
                         if (currentStep == 3) {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.RECORD_AUDIO,
-                                    Manifest.permission.READ_PHONE_STATE
-                                )
+                            val perms = mutableListOf(
+                                Manifest.permission.RECORD_AUDIO,
+                                Manifest.permission.READ_PHONE_STATE,
+                                Manifest.permission.READ_CALL_LOG,
+                                Manifest.permission.READ_CONTACTS
                             )
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            permissionLauncher.launch(perms.toTypedArray())
                         }
                         currentStep++
                     },
@@ -266,9 +270,18 @@ fun OnboardingScreen(
                 ) {
                     Text(stringResource(R.string.btn_next), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
-            } else {
                 Button(
                     onClick = {
+                        val perms = mutableListOf(
+                            Manifest.permission.RECORD_AUDIO,
+                            Manifest.permission.READ_PHONE_STATE,
+                            Manifest.permission.READ_CALL_LOG,
+                            Manifest.permission.READ_CONTACTS
+                        )
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        permissionLauncher.launch(perms.toTypedArray())
                         preferences.hasCompletedOnboarding = true
                         onFinish()
                     },

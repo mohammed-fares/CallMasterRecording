@@ -20,13 +20,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -247,12 +247,21 @@ fun RecordingsScreen(
                         onShare = {
                             val file = File(item.filePath)
                             if (file.exists()) {
+                                val uri = try {
+                                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                } catch (_: Exception) {
+                                    null
+                                }
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "audio/*"
                                     putExtra(Intent.EXTRA_SUBJECT, item.title)
-                                    putExtra(Intent.EXTRA_TEXT, "Recording: ${item.title}\n${item.notes}")
+                                    putExtra(Intent.EXTRA_TEXT, "CallMaster: ${item.title}\n${item.notes}")
+                                    if (uri != null) {
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Recording"))
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Audio Recording"))
                             }
                         },
                         onDelete = {
@@ -435,7 +444,7 @@ fun RecordingFullItemCard(
                             )
                             DropdownMenuItem(
                                 text = { Text("Edit Notes") },
-                                leadingIcon = { Icon(Icons.Default.Note, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Note, contentDescription = null) },
                                 onClick = {
                                     menuExpanded = false
                                     onEditNotes()

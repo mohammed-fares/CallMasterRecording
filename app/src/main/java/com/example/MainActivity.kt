@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         val audioPlayer = CallMasterAudioPlayer.getInstance(this)
         val preferences = CallMasterPreferences(this)
         val securityManager = CallMasterSecurityManager()
-        val aiEngine = CallMasterAiEngine(database)
+        val aiEngine = CallMasterAiEngine(database, preferences)
 
         setContent {
             CallMasterTheme(darkTheme = preferences.isDarkTheme) {

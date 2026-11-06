@@ -57,4 +57,7 @@ interface RecordingDao {
 
     @Query("DELETE FROM recordings WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM recordings WHERE title = :title")
+    suspend fun deleteByTitle(title: String)
 }

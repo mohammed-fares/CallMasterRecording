@@ -189,7 +189,7 @@ fun CallMasterActiveRecordingDialog(
                                 focusedBorderColor = RadiantGold,
                                 focusedLabelColor = RadiantGold
                             ),
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable, true).fillMaxWidth()
                         )
                         ExposedDropdownMenu(
                             expanded = sourceDropdownExpanded,

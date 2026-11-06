@@ -239,6 +239,71 @@ fun SettingsScreen(
             }
         }
 
+        // Section: AI Assistant
+        item {
+            SettingsSectionHeader(title = "المساعد الذكي (AI Assistant)")
+        }
+
+        item {
+            var showKeyInput by remember { mutableStateOf(false) }
+            var currentKey by remember { mutableStateOf(preferences.geminiCustomApiKey) }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = RadiantGold, modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "مفتاح Gemini API للتفريغ الحقيقي",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (currentKey.isNotBlank()) "المفتاح مفعل ونشط" else "اضغط لإدخال مفتاح Gemini API",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (currentKey.isNotBlank()) StatusSuccess else RadiantGold
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { showKeyInput = !showKeyInput },
+                            colors = ButtonDefaults.buttonColors(containerColor = PetroleumGreen, contentColor = LightGold),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(if (showKeyInput) "إغلاق" else "تعديل")
+                        }
+                    }
+
+                    if (showKeyInput) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = currentKey,
+                            onValueChange = {
+                                currentKey = it
+                                preferences.geminiCustomApiKey = it.trim()
+                            },
+                            label = { Text("Gemini API Key") },
+                            placeholder = { Text("AIzaSy...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+
         // Section: About & Privacy
         item {
             SettingsSectionHeader(title = stringResource(R.string.section_about))

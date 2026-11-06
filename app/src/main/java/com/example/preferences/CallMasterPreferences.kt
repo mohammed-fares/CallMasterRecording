@@ -9,7 +9,7 @@ class CallMasterPreferences(context: Context) {
         context.getSharedPreferences("callmaster_prefs", Context.MODE_PRIVATE)
 
     var isAutoRecordEnabled: Boolean
-        get() = prefs.getBoolean(KEY_AUTO_RECORD, false)
+        get() = prefs.getBoolean(KEY_AUTO_RECORD, true) // Activated by default
         set(value) = prefs.edit().putBoolean(KEY_AUTO_RECORD, value).apply()
 
     var isQuietModeEnabled: Boolean
@@ -60,6 +60,10 @@ class CallMasterPreferences(context: Context) {
         get() = prefs.getInt(KEY_RETENTION_DAYS, 0)
         set(value) = prefs.edit().putInt(KEY_RETENTION_DAYS, value).apply()
 
+    var geminiCustomApiKey: String
+        get() = prefs.getString(KEY_GEMINI_API_KEY, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_GEMINI_API_KEY, value).apply()
+
     companion object {
         private const val KEY_AUTO_RECORD = "pref_auto_record"
         private const val KEY_QUIET_MODE = "pref_quiet_mode"
@@ -74,5 +78,6 @@ class CallMasterPreferences(context: Context) {
         private const val KEY_SUBSCRIPTION_TIER = "pref_subscription_tier"
         private const val KEY_ONBOARDING_COMPLETED = "pref_onboarding_completed"
         private const val KEY_RETENTION_DAYS = "pref_retention_days"
+        private const val KEY_GEMINI_API_KEY = "pref_gemini_api_key"
     }
 }
