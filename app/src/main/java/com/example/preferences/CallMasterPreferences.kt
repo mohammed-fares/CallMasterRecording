@@ -3,6 +3,8 @@ package com.example.preferences
 import android.content.Context
 import android.content.SharedPreferences
 
+// Activated by default
+
 class CallMasterPreferences(context: Context) {
 
     private val prefs: SharedPreferences =
