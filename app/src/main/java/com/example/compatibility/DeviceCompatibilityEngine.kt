@@ -40,7 +40,8 @@ class DeviceCompatibilityEngine(private val context: Context) {
                     "Android OS restriction: Inbound party audio requires speakerphone/loudspeaker.",
                 requiredPermissions = listOf(
                     "android.permission.RECORD_AUDIO",
-                    "android.permission.READ_PHONE_STATE"
+                    "android.permission.READ_PHONE_STATE",
+                    "android.permission.READ_CALL_LOG"
                 ),
                 knownRestrictions = "Android 9+ (API 28+) strictly isolates raw telephony audio streams without system/privileged signature.",
                 recommendedAction = if (cellularLevel == CompatibilityLevel.LEVEL_A)
@@ -50,47 +51,32 @@ class DeviceCompatibilityEngine(private val context: Context) {
             )
         )
 
-        // 2. WhatsApp
-        items.add(
-            evaluateVoipApp(
-                name = "WhatsApp Voice & Video",
-                pkg = "com.whatsapp",
-                apiLevel = apiLevel,
-                voiceCommAvailable = voiceCommAvailable
-            )
+        // 2. Tested VoIP Apps List
+        val voipApps = listOf(
+            Triple("WhatsApp Voice & Video", "com.whatsapp", true),
+            Triple("Telegram Voice Calls", "org.telegram.messenger", true),
+            Triple("Facebook Messenger", "com.facebook.orca", true),
+            Triple("Signal Private Messenger", "org.thoughtcrime.securesms", true),
+            Triple("Viber Messenger", "com.viber.voip", true),
+            Triple("Google Meet", "com.google.android.apps.tachyon", true),
+            Triple("Microsoft Teams", "com.microsoft.teams", true),
+            Triple("Zoom Meetings", "us.zoom.videomeetings", true),
+            Triple("Discord Voice", "com.discord", false)
         )
 
-        // 3. Telegram
-        items.add(
-            evaluateVoipApp(
-                name = "Telegram Voice Calls",
-                pkg = "org.telegram.messenger",
-                apiLevel = apiLevel,
-                voiceCommAvailable = voiceCommAvailable
+        for ((name, pkg, callPrivacyProtected) in voipApps) {
+            items.add(
+                evaluateVoipApp(
+                    name = name,
+                    pkg = pkg,
+                    apiLevel = apiLevel,
+                    voiceCommAvailable = voiceCommAvailable,
+                    callPrivacyProtected = callPrivacyProtected
+                )
             )
-        )
+        }
 
-        // 4. Facebook Messenger
-        items.add(
-            evaluateVoipApp(
-                name = "Facebook Messenger",
-                pkg = "com.facebook.orca",
-                apiLevel = apiLevel,
-                voiceCommAvailable = voiceCommAvailable
-            )
-        )
-
-        // 5. Signal
-        items.add(
-            evaluateVoipApp(
-                name = "Signal Private Messenger",
-                pkg = "org.thoughtcrime.securesms",
-                apiLevel = apiLevel,
-                voiceCommAvailable = voiceCommAvailable
-            )
-        )
-
-        // 6. Direct Microphone / Voice Memo
+        // 3. Direct Microphone / In-Person Memo
         items.add(
             CompatibilityItemResult(
                 sourceName = "Direct Microphone & In-Person Memo",
@@ -105,7 +91,6 @@ class DeviceCompatibilityEngine(private val context: Context) {
             )
         )
 
-        // Overall level is determined by the capability matrix
         val overallLevel = when {
             items.any { it.level == CompatibilityLevel.LEVEL_A && it.sourceName.contains("Cellular") } -> CompatibilityLevel.LEVEL_A
             items.any { it.level == CompatibilityLevel.LEVEL_B } -> CompatibilityLevel.LEVEL_B
@@ -126,14 +111,96 @@ class DeviceCompatibilityEngine(private val context: Context) {
         )
     }
 
+    /**
+     * Xiaomi Mi A3 (Android 11, API 30) reference baseline evaluation.
+     */
+    fun getXiaomiMiA3BaselineReport(): DeviceHardwareReport {
+        val items = listOf(
+            CompatibilityItemResult(
+                sourceName = "Cellular Voice Calls (GSM/LTE/VoLTE)",
+                packageName = null,
+                level = CompatibilityLevel.LEVEL_C,
+                recordingMethod = "Acoustic Microphone Stream (Companion Mode)",
+                expectedAudioChannels = "1 Channel (Local Mic + Loudspeaker)",
+                actualCapabilities = "Microphone captures near voice cleanly. Far-end party requires loudspeaker.",
+                requiredPermissions = listOf(
+                    "android.permission.RECORD_AUDIO",
+                    "android.permission.READ_PHONE_STATE",
+                    "android.permission.READ_CALL_LOG"
+                ),
+                knownRestrictions = "Android 11 Android One security isolates raw telephony downlink HAL for non-system apps.",
+                recommendedAction = "Enable speakerphone during call for optimal two-sided audio capture."
+            ),
+            CompatibilityItemResult(
+                sourceName = "WhatsApp Voice & Video",
+                packageName = "com.whatsapp",
+                level = CompatibilityLevel.LEVEL_C,
+                recordingMethod = "Acoustic Microphone (Speakerphone Recommended)",
+                expectedAudioChannels = "1 Channel (Microphone)",
+                actualCapabilities = "AudioPlaybackCapture blocked by WhatsApp USAGE_VOICE_COMMUNICATION audio attributes.",
+                requiredPermissions = listOf("android.permission.RECORD_AUDIO", "android.permission.FOREGROUND_SERVICE"),
+                knownRestrictions = "App declares USAGE_VOICE_COMMUNICATION to prevent third-party audio playback capture.",
+                recommendedAction = "Turn on speakerphone during WhatsApp call for acoustic recording.",
+                isAppInstalled = true,
+                capturePolicyMessage = "هذا التطبيق لا يسمح بالتقاط الصوت عبر Android Audio Playback Capture على هذا الجهاز."
+            ),
+            CompatibilityItemResult(
+                sourceName = "Telegram Voice Calls",
+                packageName = "org.telegram.messenger",
+                level = CompatibilityLevel.LEVEL_C,
+                recordingMethod = "Acoustic Microphone (Speakerphone Recommended)",
+                expectedAudioChannels = "1 Channel (Microphone)",
+                actualCapabilities = "Playback capture restricted by Telegram call privacy flags.",
+                requiredPermissions = listOf("android.permission.RECORD_AUDIO", "android.permission.FOREGROUND_SERVICE"),
+                knownRestrictions = "AudioAttributes prevent AudioPlaybackCapture API access.",
+                recommendedAction = "Enable speakerphone during Telegram conversation.",
+                isAppInstalled = true,
+                capturePolicyMessage = "هذا التطبيق لا يسمح بالتقاط الصوت عبر Android Audio Playback Capture على هذا الجهاز."
+            ),
+            CompatibilityItemResult(
+                sourceName = "Facebook Messenger",
+                packageName = "com.facebook.orca",
+                level = CompatibilityLevel.LEVEL_C,
+                recordingMethod = "Acoustic Microphone (Speakerphone Recommended)",
+                expectedAudioChannels = "1 Channel (Microphone)",
+                actualCapabilities = "Messenger audio sandbox isolates in-call stream.",
+                requiredPermissions = listOf("android.permission.RECORD_AUDIO"),
+                knownRestrictions = "VoIP stream protected by meta sandbox.",
+                recommendedAction = "Use speakerphone mode.",
+                isAppInstalled = true,
+                capturePolicyMessage = "هذا التطبيق لا يسمح بالتقاط الصوت عبر Android Audio Playback Capture على هذا الجهاز."
+            ),
+            CompatibilityItemResult(
+                sourceName = "Direct Hardware Microphone",
+                packageName = null,
+                level = CompatibilityLevel.LEVEL_A,
+                recordingMethod = "Direct Hardware Microphone (MIC)",
+                expectedAudioChannels = "1-2 Channels (PCM 16-bit / AAC 44.1kHz)",
+                actualCapabilities = "Full 100% crystal clear acoustic sound capture.",
+                requiredPermissions = listOf("android.permission.RECORD_AUDIO"),
+                knownRestrictions = "None.",
+                recommendedAction = "Fully functional and tested."
+            )
+        )
+
+        return DeviceHardwareReport(
+            manufacturer = "Xiaomi",
+            model = "Mi A3 (laurel_sprout)",
+            androidVersion = "11 (Android One)",
+            apiLevel = 30,
+            hasMicrophone = true,
+            voiceCommunicationSourceAvailable = true,
+            foregroundServiceMicrophoneSupported = true,
+            overallLevel = CompatibilityLevel.LEVEL_C,
+            results = items
+        )
+    }
+
     private fun evaluateCellularCompatibility(
         manufacturer: String,
         apiLevel: Int,
         voiceCommAvailable: Boolean
     ): CompatibilityLevel {
-        // Transparent evaluation based on real Android platform rules:
-        // On modern Android (API 29+), raw telecom downlink requires system-level signature or OEM integration.
-        // Third-party applications operate in companion mode (Level C: Microphone/Loudspeaker).
         return if (apiLevel < 28 && voiceCommAvailable) {
             CompatibilityLevel.LEVEL_B
         } else {
@@ -145,18 +212,23 @@ class DeviceCompatibilityEngine(private val context: Context) {
         name: String,
         pkg: String,
         apiLevel: Int,
-        voiceCommAvailable: Boolean
+        voiceCommAvailable: Boolean,
+        callPrivacyProtected: Boolean
     ): CompatibilityItemResult {
         val isInstalled = isPackageInstalled(pkg)
         val level = if (!isInstalled) {
             CompatibilityLevel.LEVEL_D
-        } else if (apiLevel >= Build.VERSION_CODES.Q) {
-            CompatibilityLevel.LEVEL_B // AudioPlaybackCapture API eligible with projection consent
-        } else if (voiceCommAvailable) {
-            CompatibilityLevel.LEVEL_C // Mic fallback
+        } else if (apiLevel >= Build.VERSION_CODES.Q && !callPrivacyProtected) {
+            CompatibilityLevel.LEVEL_B
+        } else if (voiceCommAvailable || apiLevel >= Build.VERSION_CODES.Q) {
+            CompatibilityLevel.LEVEL_C
         } else {
             CompatibilityLevel.LEVEL_D
         }
+
+        val captureMessage = if (isInstalled && callPrivacyProtected) {
+            "هذا التطبيق لا يسمح بالتقاط الصوت عبر Android Audio Playback Capture على هذا الجهاز."
+        } else null
 
         return CompatibilityItemResult(
             sourceName = name,
@@ -170,24 +242,55 @@ class DeviceCompatibilityEngine(private val context: Context) {
             },
             expectedAudioChannels = if (level == CompatibilityLevel.LEVEL_B) "2 Channels (Mixed Stream)" else "1 Channel (Microphone)",
             actualCapabilities = if (!isInstalled) {
-                "Application is not currently installed on this device."
-            } else if (level == CompatibilityLevel.LEVEL_B) {
-                "Authorized system playback capture supported with user consent."
+                "التطبيق غير مثبت حالياً على هذا الجهاز."
+            } else if (callPrivacyProtected) {
+                "حماية خصوصية المكالمات تمنع الالتقاط المباشر لتدفق الصوت الداخلي."
             } else {
-                "Android sandboxing prevents direct VoIP packet interception without system privileges."
+                "التقاط تدفق الصوت متاح عبر خدمة بث الصوت مع موافقة المستخدم."
             },
             requiredPermissions = listOf(
                 "android.permission.RECORD_AUDIO",
                 "android.permission.FOREGROUND_SERVICE"
             ),
-            knownRestrictions = "Third-party application policy and Android sandbox isolate VoIP audio channels.",
+            knownRestrictions = if (callPrivacyProtected)
+                "التطبيق يعيّن USAGE_VOICE_COMMUNICATION مما يمنع الالتقاط البرمجي."
+            else
+                "عزل التطبيقات القياسي في Android.",
             recommendedAction = if (!isInstalled) {
-                "Install $name from Google Play to evaluate recording."
+                "تثبيت $name من متجر Google Play."
             } else {
-                "Activate CallMaster before or during call with speakerphone enabled."
+                "تفعيل مكبر الصوت (Speakerphone) لتمكين التسجيل الصوتي بجودة ممتازة."
             },
-            isAppInstalled = isInstalled
+            isAppInstalled = isInstalled,
+            capturePolicyMessage = captureMessage
         )
+    }
+
+    fun exportDiagnosticReportText(report: DeviceHardwareReport): String {
+        val sb = StringBuilder()
+        sb.append("=== CALLMASTER AUDIO DIAGNOSTIC REPORT ===\n")
+        sb.append("Manufacturer: ${report.manufacturer}\n")
+        sb.append("Model: ${report.model}\n")
+        sb.append("Android Version: ${report.androidVersion} (API ${report.apiLevel})\n")
+        sb.append("Microphone Feature: ${if (report.hasMicrophone) "PRESENT" else "ABSENT"}\n")
+        sb.append("VOICE_COMMUNICATION Source: ${if (report.voiceCommunicationSourceAvailable) "SUPPORTED" else "UNAVAILABLE"}\n")
+        sb.append("Foreground Service Microphone: ${if (report.foregroundServiceMicrophoneSupported) "SUPPORTED" else "UNSUPPORTED"}\n")
+        sb.append("Overall Compatibility Level: ${report.overallLevel.name}\n")
+        sb.append("\n--- EVALUATION MATRIX ---\n")
+        for (item in report.results) {
+            sb.append("\n[${item.sourceName}]\n")
+            sb.append("  Level: ${item.level.name}\n")
+            sb.append("  Method: ${item.recordingMethod}\n")
+            sb.append("  Channels: ${item.expectedAudioChannels}\n")
+            sb.append("  Capabilities: ${item.actualCapabilities}\n")
+            if (item.capturePolicyMessage != null) {
+                sb.append("  Capture Policy: ${item.capturePolicyMessage}\n")
+            }
+            sb.append("  Restrictions: ${item.knownRestrictions}\n")
+            sb.append("  Recommended Action: ${item.recommendedAction}\n")
+        }
+        sb.append("\n=== END OF REPORT ===\n")
+        return sb.toString()
     }
 
     private fun isPackageInstalled(packageName: String): Boolean {

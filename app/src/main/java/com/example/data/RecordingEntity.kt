@@ -21,10 +21,21 @@ enum class CallDirection {
 }
 
 enum class CompletenessStatus {
-    TWO_SIDED,
-    MIC_ONLY,
-    AUTHORIZED_SYSTEM,
-    UNSUPPORTED
+    SUCCESS_BOTH_SIDES,
+    SUCCESS_MIC_ONLY,
+    SUCCESS_PLAYBACK_ONLY,
+    PARTIAL_RECORDING,
+    SILENT_RECORDING,
+    SOURCE_BLOCKED,
+    PERMISSION_DENIED,
+    UNSUPPORTED_DEVICE,
+    RECORDING_INTERRUPTED;
+
+    val isSuccess: Boolean
+        get() = this == SUCCESS_BOTH_SIDES || this == SUCCESS_MIC_ONLY || this == SUCCESS_PLAYBACK_ONLY
+
+    val isSilent: Boolean
+        get() = this == SILENT_RECORDING
 }
 
 enum class BackupSyncStatus {
@@ -50,8 +61,13 @@ data class RecordingEntity(
     val filePath: String = "",
     val fileSize: Long = 0L,
     val mimeType: String = "audio/mp4",
-    val encryptionStatus: String = "PLAINTEXT", // PLAINTEXT or ENCRYPTED_AES256
-    val validationStatus: CompletenessStatus = CompletenessStatus.MIC_ONLY,
+    val encryptionStatus: String = "PLAINTEXT",
+    val validationStatus: CompletenessStatus = CompletenessStatus.SUCCESS_MIC_ONLY,
+    val audioSourceUsed: String = "MIC",
+    val rmsDb: Float = -100f,
+    val peakAmplitude: Int = 0,
+    val silenceRatio: Float = 0f,
+    val validationNote: String = "",
     val backupStatus: BackupSyncStatus = BackupSyncStatus.LOCAL_ONLY,
     val consentStatus: String = "GRANTED_EXPLICIT",
     val notes: String = "",

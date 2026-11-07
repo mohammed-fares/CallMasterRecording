@@ -17,7 +17,8 @@ data class CompatibilityItemResult(
     val requiredPermissions: List<String>,
     val knownRestrictions: String,
     val recommendedAction: String,
-    val isAppInstalled: Boolean = true
+    val isAppInstalled: Boolean = true,
+    val capturePolicyMessage: String? = null
 )
 
 data class DeviceHardwareReport(

@@ -27,7 +27,7 @@ class Converters {
 
     @TypeConverter
     fun toCompletenessStatus(value: String): CompletenessStatus =
-        runCatching { CompletenessStatus.valueOf(value) }.getOrDefault(CompletenessStatus.MIC_ONLY)
+        runCatching { CompletenessStatus.valueOf(value) }.getOrDefault(CompletenessStatus.SUCCESS_MIC_ONLY)
 
     @TypeConverter
     fun fromBackupSyncStatus(value: BackupSyncStatus): String = value.name
@@ -37,7 +37,7 @@ class Converters {
         runCatching { BackupSyncStatus.valueOf(value) }.getOrDefault(BackupSyncStatus.LOCAL_ONLY)
 }
 
-@Database(entities = [RecordingEntity::class], version = 1, exportSchema = false)
+@Database(entities = [RecordingEntity::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun recordingDao(): RecordingDao
@@ -52,7 +52,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "callmaster_database"
-                ).fallbackToDestructiveMigration(false)
+                )
+                    .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance
                 instance

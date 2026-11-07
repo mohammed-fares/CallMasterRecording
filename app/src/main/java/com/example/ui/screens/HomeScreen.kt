@@ -80,6 +80,7 @@ import com.example.ui.theme.PetroleumGreen
 import com.example.ui.theme.RadiantGold
 import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusSuccess
+import com.example.ui.theme.StatusWarning
 import com.example.ui.theme.SurfaceDark
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -605,33 +606,28 @@ fun RecordingItemCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             // Completeness tag
+            val (badgeBg, badgeText, badgeColor) = when (recording.validationStatus) {
+                CompletenessStatus.SUCCESS_BOTH_SIDES -> Triple(StatusSuccess.copy(alpha = 0.2f), "طرفين (ناجح)", StatusSuccess)
+                CompletenessStatus.SUCCESS_MIC_ONLY -> Triple(PetroleumGreen.copy(alpha = 0.4f), "ميكروفون (MIC)", RadiantGold)
+                CompletenessStatus.SUCCESS_PLAYBACK_ONLY -> Triple(RadiantGold.copy(alpha = 0.2f), "صوت التطبيق", RadiantGold)
+                CompletenessStatus.PARTIAL_RECORDING -> Triple(StatusWarning.copy(alpha = 0.2f), "تسجيل جزئي", StatusWarning)
+                CompletenessStatus.SILENT_RECORDING -> Triple(StatusError.copy(alpha = 0.25f), "صامت (تنبيه)", StatusError)
+                CompletenessStatus.SOURCE_BLOCKED -> Triple(StatusError.copy(alpha = 0.2f), "محظور برمجياً", StatusError)
+                CompletenessStatus.PERMISSION_DENIED -> Triple(StatusError.copy(alpha = 0.2f), "صلاحيات مرفوضة", StatusError)
+                CompletenessStatus.UNSUPPORTED_DEVICE -> Triple(StatusError.copy(alpha = 0.2f), "غير مدعوم", StatusError)
+                CompletenessStatus.RECORDING_INTERRUPTED -> Triple(StatusWarning.copy(alpha = 0.2f), "مقاطعة", StatusWarning)
+            }
+
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        when (recording.validationStatus) {
-                            CompletenessStatus.TWO_SIDED -> StatusSuccess.copy(alpha = 0.2f)
-                            CompletenessStatus.AUTHORIZED_SYSTEM -> RadiantGold.copy(alpha = 0.2f)
-                            CompletenessStatus.MIC_ONLY -> PetroleumGreen.copy(alpha = 0.4f)
-                            CompletenessStatus.UNSUPPORTED -> StatusError.copy(alpha = 0.2f)
-                        }
-                    )
+                    .background(badgeBg)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = when (recording.validationStatus) {
-                        CompletenessStatus.TWO_SIDED -> "Two-Sided"
-                        CompletenessStatus.AUTHORIZED_SYSTEM -> "System"
-                        CompletenessStatus.MIC_ONLY -> "Mic Only"
-                        CompletenessStatus.UNSUPPORTED -> "Invalid"
-                    },
+                    text = badgeText,
                     style = MaterialTheme.typography.labelSmall,
-                    color = when (recording.validationStatus) {
-                        CompletenessStatus.TWO_SIDED -> StatusSuccess
-                        CompletenessStatus.AUTHORIZED_SYSTEM -> RadiantGold
-                        CompletenessStatus.MIC_ONLY -> LightGold
-                        CompletenessStatus.UNSUPPORTED -> StatusError
-                    },
+                    color = badgeColor,
                     fontWeight = FontWeight.Bold
                 )
             }

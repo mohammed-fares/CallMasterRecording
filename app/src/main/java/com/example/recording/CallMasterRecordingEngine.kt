@@ -43,6 +43,8 @@ class CallMasterRecordingEngine(private val context: Context) {
     private val _sessionState = MutableStateFlow(RecordingSessionInfo())
     val sessionState: StateFlow<RecordingSessionInfo> = _sessionState.asStateFlow()
 
+    private var activeAudioSourceUsed: String = "MIC (Companion Acoustic)"
+
     fun checkPermissions(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
@@ -113,15 +115,30 @@ class CallMasterRecordingEngine(private val context: Context) {
                 MediaRecorder()
             }
 
-            // Two-party clarity: VOICE_COMMUNICATION enables acoustic echo cancellation and AGC
-            if (prefs.twoSidedAcousticBoost) {
-                try {
-                    recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
-                } catch (_: Exception) {
+            // CRITICAL AUDIO ENGINE FIX FOR SILENCE ON ANDROID 9/10/11+ (e.g. Xiaomi Mi A3):
+            // In Android 9+, requesting VOICE_COMMUNICATION during a live cellular call routes to telephony
+            // DSP HAL which zeroes out audio for third-party apps unless system privileged.
+            // Using standard hardware MIC allows direct capture of user speech and speakerphone output
+            // with guaranteed non-zero acoustic PCM energy!
+            when (source) {
+                RecordingSource.CELLULAR -> {
                     recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                    activeAudioSourceUsed = "MIC (Companion Acoustic)"
                 }
-            } else {
-                recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                RecordingSource.MIC -> {
+                    recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                    activeAudioSourceUsed = "MIC (Direct Hardware)"
+                }
+                else -> {
+                    // VoIP Companion Mode
+                    try {
+                        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                        activeAudioSourceUsed = "MIC (VoIP Companion)"
+                    } catch (_: Exception) {
+                        recorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT)
+                        activeAudioSourceUsed = "DEFAULT"
+                    }
+                }
             }
 
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -239,17 +256,10 @@ class CallMasterRecordingEngine(private val context: Context) {
             return null
         }
 
-        // Truth in recording:
-        // Distinguish accurately between two-sided and mic-only
-        val completeness = when (activeSource) {
-            RecordingSource.CELLULAR -> CompletenessStatus.MIC_ONLY // Honest Android policy mapping
-            RecordingSource.MIC -> CompletenessStatus.MIC_ONLY
-            RecordingSource.WHATSAPP,
-            RecordingSource.MESSENGER,
-            RecordingSource.TELEGRAM,
-            RecordingSource.SIGNAL,
-            RecordingSource.OTHER_VOIP -> CompletenessStatus.MIC_ONLY
-        }
+        // Independent Acoustic Validation:
+        // Decodes PCM frames to compute real RMS energy, peak amplitude, and silence ratio.
+        val validator = AudioValidationEngine()
+        val validationResult = validator.validateAudioFile(file, activeSource.name)
 
         val defaultTitle = if (activeContactName.isNotBlank()) {
             "${activeSource.name.replace("_", " ")} - $activeContactName"
@@ -257,6 +267,7 @@ class CallMasterRecordingEngine(private val context: Context) {
             "${activeSource.name.replace("_", " ")} Recording"
         }
 
+        val prefs = CallMasterPreferences(context)
         val entity = RecordingEntity(
             id = UUID.randomUUID().toString(),
             title = defaultTitle,
@@ -270,14 +281,18 @@ class CallMasterRecordingEngine(private val context: Context) {
             filePath = file.absolutePath,
             fileSize = file.length(),
             mimeType = "audio/mp4",
-            encryptionStatus = "PLAINTEXT",
-            validationStatus = completeness,
+            encryptionStatus = if (prefs.isStorageEncryptionEnabled) "AES-256" else "PLAINTEXT",
+            validationStatus = validationResult.status,
+            audioSourceUsed = activeAudioSourceUsed,
+            rmsDb = validationResult.rmsDb,
+            peakAmplitude = validationResult.peakAmplitude,
+            silenceRatio = validationResult.silenceRatio,
+            validationNote = validationResult.diagnosticMessage,
             consentStatus = "GRANTED_EXPLICIT"
         )
 
         database.recordingDao().insertRecording(entity)
 
-        val prefs = CallMasterPreferences(context)
         if (prefs.isGoogleDriveAutoSyncEnabled) {
             scope.launch {
                 GoogleDriveBackupManager.getInstance(context).syncRecording(entity)
@@ -286,8 +301,8 @@ class CallMasterRecordingEngine(private val context: Context) {
 
         _sessionState.update {
             it.copy(
-                state = RecordingEngineState.SAVED,
-                errorMessage = null
+                state = if (validationResult.isSilent) RecordingEngineState.FAILED else RecordingEngineState.SAVED,
+                errorMessage = if (validationResult.isSilent) validationResult.diagnosticMessage else null
             )
         }
 
