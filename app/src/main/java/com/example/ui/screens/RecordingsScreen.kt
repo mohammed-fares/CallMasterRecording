@@ -827,21 +827,32 @@ fun RecordingFullItemCard(
 
 private fun shareRecordingAudio(context: android.content.Context, item: RecordingEntity) {
     val file = File(item.filePath)
-    if (file.exists()) {
-        val uri = try {
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        } catch (_: Exception) {
-            null
-        }
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "audio/*"
-            putExtra(Intent.EXTRA_SUBJECT, item.title)
-            putExtra(Intent.EXTRA_TEXT, "CallMaster: ${item.title}\n${item.notes}")
-            if (uri != null) {
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        }
-        context.startActivity(Intent.createChooser(shareIntent, "Share Audio Recording"))
+    if (!file.exists()) return
+
+    val isEncrypted = item.encryptionStatus.contains("AES", ignoreCase = true) || file.name.endsWith(".enc", ignoreCase = true)
+    val shareFile: File
+    if (isEncrypted) {
+        val sec = com.example.security.CallMasterSecurityManager()
+        val tempShare = File(context.cacheDir, "share_${item.id}.m4a")
+        val ok = sec.decryptFile(file, tempShare)
+        shareFile = if (ok && tempShare.exists() && tempShare.length() > 0L) tempShare else file
+    } else {
+        shareFile = file
     }
+
+    val uri = try {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", shareFile)
+    } catch (_: Exception) {
+        null
+    }
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "audio/*"
+        putExtra(Intent.EXTRA_SUBJECT, item.title)
+        putExtra(Intent.EXTRA_TEXT, "CallMaster Recording: ${item.title}")
+        if (uri != null) {
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "Share Audio Recording"))
 }

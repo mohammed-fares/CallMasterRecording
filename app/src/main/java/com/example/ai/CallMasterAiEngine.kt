@@ -131,8 +131,31 @@ class CallMasterAiEngine(
         }
 
         try {
-            // Read audio bytes and convert to Base64
-            val audioBytes = audioFile.readBytes()
+            // Read audio bytes (transparently decrypt if AES-256-GCM encrypted)
+            val isEncrypted = recording.encryptionStatus.contains("AES", ignoreCase = true) ||
+                    audioFile.name.endsWith(".enc", ignoreCase = true)
+
+            val audioBytes: ByteArray
+            if (isEncrypted) {
+                val secManager = com.example.security.CallMasterSecurityManager()
+                val tempDecrypted = File(audioFile.parentFile ?: File("."), "ai_temp_${recording.id}.m4a")
+                val success = secManager.decryptFile(audioFile, tempDecrypted)
+                if (!success || !tempDecrypted.exists() || tempDecrypted.length() == 0L) {
+                    tempDecrypted.delete()
+                    _uiState.update {
+                        it.copy(
+                            status = AiProcessingStatus.FAILED,
+                            errorMessage = "تعذر فك تشفير الملف الصوتي لتحليله بواسطة مفتاح الأمان."
+                        )
+                    }
+                    return@withContext false
+                }
+                audioBytes = tempDecrypted.readBytes()
+                secManager.secureDelete(tempDecrypted)
+            } else {
+                audioBytes = audioFile.readBytes()
+            }
+
             val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
             val mimeType = if (recording.filePath.endsWith(".wav", true)) "audio/wav" else "audio/mp4"
 

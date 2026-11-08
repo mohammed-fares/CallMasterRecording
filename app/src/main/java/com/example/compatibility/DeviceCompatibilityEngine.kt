@@ -309,9 +309,53 @@ class DeviceCompatibilityEngine(private val context: Context) {
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT
             )
-            minBuf > 0
+            if (minBuf <= 0) return false
+
+            val hasRecordPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasRecordPerm) {
+                var record: AudioRecord? = null
+                try {
+                    record = AudioRecord(
+                        source,
+                        44100,
+                        AudioFormat.CHANNEL_IN_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        minBuf
+                    )
+                    record.state == AudioRecord.STATE_INITIALIZED
+                } finally {
+                    try {
+                        record?.release()
+                    } catch (_: Exception) {}
+                }
+            } else {
+                minBuf > 0
+            }
         } catch (_: Exception) {
             false
         }
+    }
+
+    /**
+     * Live empirical hardware probe for audio sources on the current physical device.
+     */
+    fun runEmpiricalAudioSourceBenchmark(): Map<String, Boolean> {
+        val sources = mapOf(
+            "MIC (Hardware Microphone)" to MediaRecorder.AudioSource.MIC,
+            "VOICE_COMMUNICATION (VoIP / In-Call Acoustic)" to MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+            "VOICE_RECOGNITION (Speech-tuned Engine)" to MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            "DEFAULT (System Standard Input)" to MediaRecorder.AudioSource.DEFAULT,
+            "CAMCORDER (Acoustic Array)" to MediaRecorder.AudioSource.CAMCORDER
+        )
+
+        val results = mutableMapOf<String, Boolean>()
+        for ((label, src) in sources) {
+            results[label] = testAudioSourceAvailability(src)
+        }
+        return results
     }
 }

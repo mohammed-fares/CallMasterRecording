@@ -11,8 +11,12 @@ class CallMasterPreferences(context: Context) {
         context.getSharedPreferences("callmaster_prefs", Context.MODE_PRIVATE)
 
     var isAutoRecordEnabled: Boolean
-        get() = prefs.getBoolean(KEY_AUTO_RECORD, true) // Activated by default
+        get() = prefs.getBoolean(KEY_AUTO_RECORD, false) // Default FALSE for strict privacy compliance
         set(value) = prefs.edit().putBoolean(KEY_AUTO_RECORD, value).apply()
+
+    var hasApprovedCloudAiProcessing: Boolean
+        get() = prefs.getBoolean(KEY_CLOUD_AI_CONSENT, false)
+        set(value) = prefs.edit().putBoolean(KEY_CLOUD_AI_CONSENT, value).apply()
 
     var isQuietModeEnabled: Boolean
         get() = prefs.getBoolean(KEY_QUIET_MODE, false)
@@ -132,5 +136,6 @@ class CallMasterPreferences(context: Context) {
         private const val KEY_GDRIVE_EMAIL = "pref_gdrive_email"
         private const val KEY_GDRIVE_FOLDER = "pref_gdrive_folder"
         private const val KEY_GDRIVE_LAST_SYNC = "pref_gdrive_last_sync"
+        private const val KEY_CLOUD_AI_CONSENT = "pref_cloud_ai_consent"
     }
 }

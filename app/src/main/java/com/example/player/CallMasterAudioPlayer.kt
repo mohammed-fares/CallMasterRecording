@@ -38,6 +38,9 @@ class CallMasterAudioPlayer(private val context: Context) {
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
 
+    private val securityManager = com.example.security.CallMasterSecurityManager()
+    private var activePlaybackTempFile: File? = null
+
     fun loadAndPlay(recording: RecordingEntity) {
         val file = File(recording.filePath)
         if (!file.exists()) {
@@ -45,7 +48,7 @@ class CallMasterAudioPlayer(private val context: Context) {
                 it.copy(
                     currentRecording = recording,
                     isPlaying = false,
-                    errorMessage = "Audio file not found on device storage."
+                    errorMessage = "ملف التسجيل غير موجود على مساحة الهاتف."
                 )
             }
             return
@@ -53,12 +56,38 @@ class CallMasterAudioPlayer(private val context: Context) {
 
         try {
             stop()
+
+            val isEncrypted = recording.encryptionStatus.contains("AES", ignoreCase = true) ||
+                    file.name.endsWith(".enc", ignoreCase = true)
+
+            val playTargetFile: File
+            if (isEncrypted) {
+                val tempFile = File(context.cacheDir, "temp_play_${recording.id}_${System.currentTimeMillis()}.m4a")
+                val decryptSuccess = securityManager.decryptFile(file, tempFile)
+                if (!decryptSuccess || !tempFile.exists() || tempFile.length() == 0L) {
+                    tempFile.delete()
+                    _playerState.update {
+                        it.copy(
+                            currentRecording = recording,
+                            isPlaying = false,
+                            errorMessage = "فشل فك تشفير التسجيل. تأكد من سلامة مفتاح الأمان."
+                        )
+                    }
+                    return
+                }
+                activePlaybackTempFile = tempFile
+                playTargetFile = tempFile
+            } else {
+                playTargetFile = file
+            }
+
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(file.absolutePath)
+                setDataSource(playTargetFile.absolutePath)
                 prepare()
                 setOnCompletionListener {
                     _playerState.update { it.copy(isPlaying = false, currentPositionMs = duration) }
                     stopProgressTracking()
+                    cleanupTempPlaybackFile()
                 }
                 start()
             }
@@ -77,11 +106,12 @@ class CallMasterAudioPlayer(private val context: Context) {
 
         } catch (e: Exception) {
             Log.e("AudioPlayer", "Error starting playback", e)
+            cleanupTempPlaybackFile()
             _playerState.update {
                 it.copy(
                     currentRecording = recording,
                     isPlaying = false,
-                    errorMessage = "Playback error: ${e.localizedMessage}"
+                    errorMessage = "خطأ في تشغيل الصوت: ${e.localizedMessage}"
                 )
             }
         }
@@ -155,6 +185,7 @@ class CallMasterAudioPlayer(private val context: Context) {
 
     fun close() {
         stop()
+        cleanupTempPlaybackFile()
         _playerState.update { PlayerState() }
     }
 
@@ -170,7 +201,22 @@ class CallMasterAudioPlayer(private val context: Context) {
             @Suppress("DEPRECATION")
             audioManager.isSpeakerphoneOn = true
         } catch (_: Exception) {}
+        cleanupTempPlaybackFile()
         _playerState.update { it.copy(isPlaying = false, isSpeakerphoneOn = true) }
+    }
+
+    private fun cleanupTempPlaybackFile() {
+        activePlaybackTempFile?.let { temp ->
+            securityManager.secureDelete(temp)
+        }
+        activePlaybackTempFile = null
+
+        // Also clean any dangling temporary playback files from previous crashes
+        try {
+            context.cacheDir.listFiles { _, name -> name.startsWith("temp_play_") }?.forEach { f ->
+                f.delete()
+            }
+        } catch (_: Exception) {}
     }
 
     private fun startProgressTracking() {

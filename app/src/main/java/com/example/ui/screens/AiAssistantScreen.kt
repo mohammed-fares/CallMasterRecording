@@ -101,6 +101,55 @@ fun AiAssistantScreen(
     var selectedLanguage by remember { mutableStateOf("ar") } // "ar" or "en"
     var apiKeyInput by remember { mutableStateOf(aiEngine.getEffectiveApiKey()) }
     var showApiKeyField by remember { mutableStateOf(aiEngine.getEffectiveApiKey().isBlank()) }
+    var apiKeyVisible by remember { mutableStateOf(false) }
+    var showConsentDialog by remember { mutableStateOf(false) }
+
+    if (showConsentDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showConsentDialog = false },
+            title = {
+                Text(
+                    text = "موافقة صريحة على معالجة الصوت السحابية",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = RadiantGold
+                )
+            },
+            text = {
+                Text(
+                    text = "سيتم إرسال محتوى هذا التسجيل الصوتي بأمان عبر اتصال TLS مشفر إلى نموذج Google Gemini API لاستخراج النص الصوتي وتوليد الملخص التنفيذي.\n\nهل توافق صراحة على إرسال التسجيل ومعالجته؟ لن يتم إرسال أي بيانات دون موافقتك الصريحة.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConsentDialog = false
+                        selectedRecording?.let { rec ->
+                            scope.launch {
+                                aiEngine.analyzeRecording(
+                                    recording = rec,
+                                    languagePreference = selectedLanguage,
+                                    customApiKey = apiKeyInput.ifBlank { null },
+                                    hasUserApprovedCloudProcessing = true
+                                )
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RadiantGold, contentColor = DarkGreen)
+                ) {
+                    Text("أوافق وأبدأ التحليل", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showConsentDialog = false }) {
+                    Text("إلغاء", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            containerColor = SurfaceDark
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -182,6 +231,15 @@ fun AiAssistantScreen(
                             label = { Text("Gemini API Key") },
                             placeholder = { Text("AIzaSy...") },
                             singleLine = true,
+                            visualTransformation = if (apiKeyVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            trailingIcon = {
+                                Text(
+                                    text = if (apiKeyVisible) "إخفاء" else "إظهار",
+                                    color = RadiantGold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.clickable { apiKeyVisible = !apiKeyVisible }.padding(8.dp)
+                                )
+                            },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = RadiantGold,
                                 unfocusedBorderColor = PetroleumGreen
@@ -320,15 +378,8 @@ fun AiAssistantScreen(
             item {
                 Button(
                     onClick = {
-                        selectedRecording?.let { rec ->
-                            scope.launch {
-                                aiEngine.analyzeRecording(
-                                    recording = rec,
-                                    languagePreference = selectedLanguage,
-                                    customApiKey = apiKeyInput.ifBlank { null },
-                                    hasUserApprovedCloudProcessing = true
-                                )
-                            }
+                        if (selectedRecording != null) {
+                            showConsentDialog = true
                         }
                     },
                     enabled = selectedRecording != null && uiState.status != AiProcessingStatus.PROCESSING,

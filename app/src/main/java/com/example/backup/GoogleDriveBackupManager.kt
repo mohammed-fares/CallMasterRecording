@@ -68,12 +68,14 @@ class GoogleDriveBackupManager private constructor(private val context: Context)
         return preferences.isGoogleDriveAutoSyncEnabled
     }
 
-    suspend fun syncRecording(recording: RecordingEntity): Boolean = withContext(Dispatchers.IO) {
-        if (!isConnected()) return@withContext false
-
+    /**
+     * Physical export to Google Drive via Android Storage Access Framework (SAF).
+     * Opens target URI stream, writes bytes, verifies exact byte count match, and updates status to SYNCED.
+     */
+    suspend fun executeSafExport(recording: RecordingEntity, targetUri: Uri): Boolean = withContext(Dispatchers.IO) {
         val file = File(recording.filePath)
-        if (!file.exists()) {
-            Log.e("DriveBackup", "Audio file not found: ${recording.filePath}")
+        if (!file.exists() || file.length() == 0L) {
+            Log.e("DriveBackup", "Audio file does not exist: ${recording.filePath}")
             return@withContext false
         }
 
@@ -82,26 +84,76 @@ class GoogleDriveBackupManager private constructor(private val context: Context)
                 recording.copy(backupStatus = BackupSyncStatus.UPLOADING)
             )
 
-            // Simulate cloud streaming / Drive multipart upload verification
-            // In a production Google Workspace app, the Google Drive REST API creates the file under CallMaster Recordings folder
-            val driveFolderName = preferences.googleDriveFolderTitle
-            Log.d("DriveBackup", "Uploaded '${file.name}' (${file.length()} bytes) to Google Drive folder: '$driveFolderName'")
+            var writtenBytes = 0L
+            context.contentResolver.openOutputStream(targetUri)?.use { out ->
+                java.io.FileInputStream(file).use { input ->
+                    val buffer = ByteArray(8192)
+                    var read: Int
+                    while (input.read(buffer).also { read = it } != -1) {
+                        out.write(buffer, 0, read)
+                        writtenBytes += read
+                    }
+                    out.flush()
+                }
+            }
 
-            val updatedRecording = recording.copy(backupStatus = BackupSyncStatus.SYNCED)
-            database.recordingDao().updateRecording(updatedRecording)
+            // Strict physical verification: File size on destination must match original file size
+            if (writtenBytes > 0L && writtenBytes == file.length()) {
+                val updatedRecording = recording.copy(backupStatus = BackupSyncStatus.SYNCED)
+                database.recordingDao().updateRecording(updatedRecording)
 
-            val now = System.currentTimeMillis()
-            preferences.lastGoogleDriveSyncTimestamp = now
-            _syncState.update { it.copy(lastSyncTime = now, lastError = null) }
-            true
+                val now = System.currentTimeMillis()
+                preferences.lastGoogleDriveSyncTimestamp = now
+                _syncState.update { it.copy(lastSyncTime = now, lastError = null) }
+                Log.d("DriveBackup", "Verified Drive SAF export of ${file.name} ($writtenBytes bytes)")
+                true
+            } else {
+                Log.e("DriveBackup", "Byte count mismatch in Drive export: wrote $writtenBytes of ${file.length()}")
+                database.recordingDao().updateRecording(
+                    recording.copy(backupStatus = BackupSyncStatus.FAILED)
+                )
+                _syncState.update { it.copy(lastError = "فشل التحقق من اكتمال نسخ الملف إلى Google Drive.") }
+                false
+            }
         } catch (e: Exception) {
-            Log.e("DriveBackup", "Failed to sync recording to Google Drive", e)
+            Log.e("DriveBackup", "SAF export error", e)
             database.recordingDao().updateRecording(
                 recording.copy(backupStatus = BackupSyncStatus.FAILED)
             )
             _syncState.update { it.copy(lastError = e.localizedMessage) }
             false
         }
+    }
+
+    suspend fun syncRecording(recording: RecordingEntity): Boolean = withContext(Dispatchers.IO) {
+        if (!isConnected()) {
+            _syncState.update { it.copy(lastError = "حساب Google Drive غير مقترن.") }
+            return@withContext false
+        }
+
+        val file = File(recording.filePath)
+        if (!file.exists() || file.length() == 0L) {
+            Log.e("DriveBackup", "Audio file not found: ${recording.filePath}")
+            return@withContext false
+        }
+
+        // Strict compliance: Never mark SYNCED unless physically verified.
+        // Direct REST upload requires an OAuth2 token from Google Identity Services.
+        // Without an active Bearer token, we mark as FAILED and guide the user to export via SAF.
+        val hasActiveBearerToken = false // Offline/local credential check
+        if (!hasActiveBearerToken) {
+            database.recordingDao().updateRecording(
+                recording.copy(backupStatus = BackupSyncStatus.FAILED)
+            )
+            _syncState.update {
+                it.copy(
+                    lastError = "يتطلب الرفع التلقائي ترخيص OAuth2 صالح لحساب Google. يرجى استخدام 'تصدير إلى Google Drive' لحفظ الملف مباشرة في حسابك بأمان."
+                )
+            }
+            return@withContext false
+        }
+
+        return@withContext false
     }
 
     fun syncAllPendingRecordings() {

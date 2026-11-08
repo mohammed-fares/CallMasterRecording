@@ -272,6 +272,40 @@ class CallMasterRecordingEngine(private val context: Context) {
         }
 
         val prefs = CallMasterPreferences(context)
+        val securityManager = com.example.security.CallMasterSecurityManager()
+        var savedFilePath = file.absolutePath
+        var savedFileSize = file.length()
+        var actualEncryptionStatus = "PLAINTEXT"
+
+        // Actual cryptographic AES-256-GCM encryption on the file before saving
+        if (prefs.isStorageEncryptionEnabled) {
+            val encFile = File(file.parentFile, "${file.name}.enc")
+            val encryptSuccess = securityManager.encryptFile(file, encFile)
+            if (encryptSuccess && encFile.exists() && encFile.length() > 0) {
+                // Securely shred the plaintext original
+                securityManager.secureDelete(file)
+                savedFilePath = encFile.absolutePath
+                savedFileSize = encFile.length()
+                actualEncryptionStatus = "AES-256-GCM"
+                Log.d("CallMasterEngine", "File successfully encrypted with AES-256-GCM: ${encFile.name}")
+            } else {
+                Log.w("CallMasterEngine", "Encryption failed; saving as PLAINTEXT without deceptive status.")
+                actualEncryptionStatus = "PLAINTEXT"
+            }
+        }
+
+        // Truth in recording:
+        // Do NOT claim both sides unless verified by validation result
+        val verifiedStatus = if (validationResult.isSilent) {
+            CompletenessStatus.SILENT_RECORDING
+        } else if (validationResult.status == CompletenessStatus.SUCCESS_BOTH_SIDES) {
+            CompletenessStatus.SUCCESS_BOTH_SIDES
+        } else if (activeSource == RecordingSource.CELLULAR) {
+            CompletenessStatus.SUCCESS_MIC_ONLY // Honest cellular mic capture
+        } else {
+            validationResult.status
+        }
+
         val entity = RecordingEntity(
             id = UUID.randomUUID().toString(),
             title = defaultTitle,
@@ -282,11 +316,11 @@ class CallMasterRecordingEngine(private val context: Context) {
             startedAt = sessionStartTime,
             endedAt = endTime,
             durationMs = durationMs,
-            filePath = file.absolutePath,
-            fileSize = file.length(),
-            mimeType = "audio/mp4",
-            encryptionStatus = if (prefs.isStorageEncryptionEnabled) "AES-256" else "PLAINTEXT",
-            validationStatus = validationResult.status,
+            filePath = savedFilePath,
+            fileSize = savedFileSize,
+            mimeType = if (actualEncryptionStatus == "AES-256-GCM") "application/octet-stream" else "audio/mp4",
+            encryptionStatus = actualEncryptionStatus,
+            validationStatus = verifiedStatus,
             audioSourceUsed = activeAudioSourceUsed,
             rmsDb = validationResult.rmsDb,
             peakAmplitude = validationResult.peakAmplitude,
