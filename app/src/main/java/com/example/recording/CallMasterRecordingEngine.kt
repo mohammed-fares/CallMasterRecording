@@ -87,14 +87,13 @@ class CallMasterRecordingEngine(private val context: Context) {
 
             val prefs = CallMasterPreferences(context)
             val baseDir: File = if (prefs.customStorageFolder.isNotBlank()) {
-                File(prefs.customStorageFolder)
+                val custom = File(prefs.customStorageFolder)
+                if (custom.exists() || custom.mkdirs()) custom else context.filesDir
             } else {
-                val ext = context.getExternalFilesDir(android.os.Environment.DIRECTORY_RECORDINGS)
-                if (ext != null) {
-                    File(ext, "CallMaster")
-                } else {
-                    File(context.filesDir, "recordings")
-                }
+                val ext = context.getExternalFilesDir("Recordings")
+                    ?: context.getExternalFilesDir(null)
+                    ?: File(context.filesDir, "Recordings")
+                File(ext, "CallMaster")
             }
             if (!baseDir.exists()) {
                 baseDir.mkdirs()
@@ -134,7 +133,7 @@ class CallMasterRecordingEngine(private val context: Context) {
                     try {
                         recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
                         activeAudioSourceUsed = "MIC (VoIP Companion)"
-                    } catch (_: Exception) {
+                    } catch (_: Throwable) {
                         recorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT)
                         activeAudioSourceUsed = "DEFAULT"
                     }
@@ -165,12 +164,17 @@ class CallMasterRecordingEngine(private val context: Context) {
             startSessionTracking()
             return true
 
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("CallMasterEngine", "Error starting recorder", e)
+            val userMsg = if (e.message?.contains("start failed", ignoreCase = true) == true) {
+                "الميكروفون مشغول حالياً بواسطة تطبيق آخر (مثل مسجل الشاشة). يرجى إيقاف تسجيل الشاشة والمحاولة مجدداً."
+            } else {
+                "تعذر تهيئة مسجل الصوت: ${e.localizedMessage ?: "خطأ في عتاد الصوت"}"
+            }
             _sessionState.update {
                 it.copy(
                     state = RecordingEngineState.FAILED,
-                    errorMessage = "Failed to initialize audio recorder: ${e.localizedMessage ?: "Unknown hardware error"}"
+                    errorMessage = userMsg
                 )
             }
             releaseRecorder()

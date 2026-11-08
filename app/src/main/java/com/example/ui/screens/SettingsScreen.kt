@@ -134,8 +134,10 @@ fun SettingsScreen(
     var isAnalyzingLastRecording by remember { mutableStateOf(false) }
 
     val defaultStoragePath = remember {
-        val ext = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)
-        if (ext != null) File(ext, "CallMaster").absolutePath else File(context.filesDir, "recordings").absolutePath
+        val ext = context.getExternalFilesDir("Recordings")
+            ?: context.getExternalFilesDir(null)
+            ?: File(context.filesDir, "Recordings")
+        File(ext, "CallMaster").absolutePath
     }
 
     LazyColumn(
@@ -685,8 +687,10 @@ fun SettingsScreen(
                             isAnalyzingLastRecording = true
                             scope.launch {
                                 val db = AppDatabase.getInstance(context)
-                                val baseDir = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)?.let { File(it, "CallMaster") }
-                                val files = baseDir?.listFiles()?.sortedByDescending { it.lastModified() }
+                                val baseDir = (context.getExternalFilesDir("Recordings")
+                                    ?: context.getExternalFilesDir(null)
+                                    ?: context.filesDir).let { File(it, "CallMaster") }
+                                val files = baseDir.listFiles()?.sortedByDescending { it.lastModified() }
                                 val lastFile = files?.firstOrNull { it.isFile && it.name.endsWith(".m4a") }
                                 if (lastFile != null) {
                                     val validator = AudioValidationEngine()
